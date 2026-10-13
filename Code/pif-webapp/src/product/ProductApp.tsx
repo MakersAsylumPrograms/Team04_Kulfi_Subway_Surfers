@@ -6,6 +6,7 @@ import { MapView, type MapPalette } from '../map/MapView'
 import { hasWebBluetooth } from '../pet/link'
 import { usePet } from '../pet/usePet'
 import { routes } from '../position/routes'
+import type { Fix } from '../position/types'
 import { useTheme } from './useTheme'
 
 // What visitors see: a full-screen map with the place you're at on top and one sheet at
@@ -22,10 +23,37 @@ const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', unheard: '#8a90
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const distance = (m: number) => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`)
 
+// Before a journey: if this browser already allows location, open the map on where you are
+// (with the stories around you) instead of the first story's place. It never asks.
+function usePreviewFix(): Fix | null {
+  const [fix, setFix] = useState<Fix | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    navigator.permissions
+      ?.query({ name: 'geolocation' as PermissionName })
+      .then((p) => {
+        if (cancelled || p.state !== 'granted') return
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            !cancelled &&
+            setFix({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, timestamp: pos.timestamp }),
+          () => {},
+          { maximumAge: 60000, timeout: 10000 },
+        )
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return fix
+}
+
 export function ProductApp() {
   const theme = useTheme()
   const pet = usePet(stories)
   const journey = useJourney(stories, pet.pet)
+  const previewFix = usePreviewFix()
   // Which story has its text open; a new story starts closed.
   const [readingId, setReadingId] = useState<string | null>(null)
   const heardIds = useMemo(() => new Set(journey.heard.map((s) => s.id)), [journey.heard])
@@ -39,7 +67,7 @@ export function ProductApp() {
       <div className="absolute inset-0">
         <MapView
           fill
-          fix={journey.fix}
+          fix={journey.fix ?? previewFix}
           path={journey.path}
           stories={stories}
           revealed={allIds}
