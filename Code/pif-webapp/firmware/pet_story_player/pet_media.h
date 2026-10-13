@@ -396,7 +396,9 @@ void mediaTick() {
   if (!media.playing) return;
   uint32_t now = millis();
   // The sound is the clock once it's running: media time = sound time + offset.
-  if (media.hasAudio && mediaAudioOn && mediaAudioPlayed > 0) {
+  // Only while there is sound left: a sound shorter than the video must not freeze the picture
+  // (after it ends, the pet's own clock carries on from where the sound left off).
+  if (media.hasAudio && mediaAudioOn && mediaAudioPlayed > 0 && mediaAudioFrom + mediaAudioPlayed < mediaWavLen) {
     int64_t t = (int64_t)(mediaAudioFrom + mediaAudioPlayed) * 1000 / mediaWavByteRate + media.offsetMs;
     media.t0 = now - (uint32_t)max((int64_t)0, t);
   }

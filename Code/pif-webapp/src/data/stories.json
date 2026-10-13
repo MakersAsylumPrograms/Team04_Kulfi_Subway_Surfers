@@ -60,6 +60,21 @@
         "approved": false
     },
     {
+        "id": "moira-in-moira",
+        "place": "Moira",
+        "title": "Moira In Thane",
+        "lat": 19.224376,
+        "lng": 72.968394,
+        "radius_m": 1000,
+        "segment": "test",
+        "text": "Once upon a time a girl in Goa saw an elephant. Her name was Moira. The elephant was very big. Suddenly the elephant started flying. She really wanted to pet him. But the Elephant fell on the her. However, because she was a princess, she lifted him up with her pinky finger. After that she simply walked away with her giraffe. Both of them built a parachute and flew away, and they all lived happily ever after.",
+        "audio": "moira-in-moira.mp3",
+        "icon_id": 4,
+        "duration_s": 42,
+        "source": "",
+        "approved": false
+    },
+    {
         "id": "placeholder-story-01",
         "place": "Placeholder place 1",
         "title": "Story 1",

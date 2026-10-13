@@ -236,12 +236,10 @@ void screenSplash(const char* name, uint32_t ms) {
 // After startup: from black, fade up to the white background (the backlight is wired straight
 // to 3.3 V, so the picture fades rather than the light).
 void screenFadeIn() {
-  const int steps = 12;
-  for (int i = 1; i <= steps; i++) {
-    uint8_t v = 255 * i / steps;
-    tft.fillScreen(((v & 0xF8) << 8) | ((v & 0xFC) << 3) | (v >> 3));
-    delay(15);
-  }
+  // Few steps, no pauses: each step repaints the whole screen (~60 ms at 20 MHz), so more steps
+  // look like slow wipes rather than a fade.
+  const uint8_t levels[] = { 40, 90, 150, 205, 240, 255 };
+  for (uint8_t v : levels) tft.fillScreen(((v & 0xF8) << 8) | ((v & 0xFC) << 3) | (v >> 3));
 }
 
 // Two screens, upright 240x320, on white:
