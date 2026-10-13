@@ -4,6 +4,8 @@
 // installing. Pet side: firmware/pet_story_player/pet_media.h.
 import { decodeSound, prepareSound } from './audio'
 
+export type Fit = 'original' | 'fit' | 'cover' | 'stretch'
+
 export interface ConvertOptions {
   width: number // on the pet's screen, px (height follows the picture's shape)
   fps: number
@@ -15,6 +17,9 @@ export interface ConvertOptions {
   rotation: number // the pet's setRotation(): 2 portrait, 3 landscape
   loop: boolean
   y: number // -1 = centred
+  fit: Fit // how the frame sits on the screen (the pet scales it while playing)
+  top: string // text above the picture ("|" = new line); drawn once by the pet
+  bottom: string // text below the picture
 }
 
 export interface Converted {
@@ -68,7 +73,7 @@ export function wavBytes(pcm: Int16Array, rate: number) {
 }
 
 export function cfgText(o: ConvertOptions) {
-  return `fps=${o.fps}\nrotation=${o.rotation}\nx=-1\ny=${o.y}\nloop=${o.loop ? 1 : 0}\noffset=0\n`
+  return `fps=${o.fps}\nrotation=${o.rotation}\nfit=${o.fit}\nx=-1\ny=${o.y}\nloop=${o.loop ? 1 : 0}\noffset=0\n${o.top ? `top=${o.top}\n` : ''}${o.bottom ? `bottom=${o.bottom}\n` : ''}`
 }
 
 /** A name the pet's card and commands are happy with. */

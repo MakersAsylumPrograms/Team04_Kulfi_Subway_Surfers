@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { type Converted, type ConvertOptions, convertPictures, convertVideo, ffmpegCommands, safeName, soundFile } from './convert'
+import { type Converted, type ConvertOptions, type Fit, convertPictures, convertVideo, ffmpegCommands, safeName, soundFile } from './convert'
 import { LiveSender, hasSerial } from './petSerial'
 import { Choice, Field, Num } from './ui'
 
@@ -29,6 +29,9 @@ const DEFAULT_OPTIONS: ConvertOptions = {
   sound: true,
   rate: 22050,
   rotation: 2,
+  fit: 'original',
+  top: '',
+  bottom: '',
   loop: false,
   y: -1,
 }
@@ -53,6 +56,10 @@ export function MediaDashboard() {
   const [playing, setPlaying] = useState<{ name: string; info: string } | null>(null)
   const [stat, setStat] = useState<Stat | null>(null)
   const [loop, setLoop] = useState(false)
+  const [fit, setFit] = useState<Fit>('original')
+  const [turn, setTurn] = useState(2)
+  const [topText, setTopText] = useState('')
+  const [bottomText, setBottomText] = useState('')
   const [fps, setFps] = useState(15)
   const [offset, setOffset] = useState(0)
   const [volume, setVolume] = useState(90)
@@ -78,6 +85,8 @@ export function MediaDashboard() {
       setPlaying({ name: play[1], info: play[2] })
       setFps(Number(play[2].match(/fps=([\d.]+)/)?.[1] ?? 15))
       setLoop(play[2].includes('loop=1'))
+      setFit((play[2].match(/fit=(\w+)/)?.[1] as Fit) ?? 'original')
+      setTurn(Number(play[2].match(/rotation=(\d)/)?.[1] ?? 2))
       setStat(null)
     }
     if (line.startsWith('MEDIADONE') || line === 'MEDIAOK stopped') setPlaying(null)
@@ -267,6 +276,54 @@ export function MediaDashboard() {
                   : `Keeping up at ${fps} fps.`}
               </p>
             )}
+            <Field label="Size on the screen">
+              <Choice
+                value={fit}
+                options={[
+                  ['original', 'Actual'],
+                  ['fit', 'Fit'],
+                  ['cover', 'Fill (crop)'],
+                  ['stretch', 'Stretch'],
+                ]}
+                onChange={(v) => {
+                  setFit(v)
+                  cmd(`media fit ${v}`)
+                }}
+              />
+            </Field>
+            <Field label="Text above (| = new line; Enter to send)">
+              <input
+                value={topText}
+                onChange={(e) => setTopText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && cmd(`media top ${topText}`)}
+                onBlur={() => cmd(`media top ${topText}`)}
+                className="w-56 rounded border border-neutral-300 px-2 py-0.5 text-sm"
+              />
+            </Field>
+            <Field label="Text below">
+              <input
+                value={bottomText}
+                onChange={(e) => setBottomText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && cmd(`media bottom ${bottomText}`)}
+                onBlur={() => cmd(`media bottom ${bottomText}`)}
+                className="w-56 rounded border border-neutral-300 px-2 py-0.5 text-sm"
+              />
+            </Field>
+            <Field label="Turn">
+              <Choice
+                value={turn}
+                options={[
+                  [2, 'Upright'],
+                  [0, 'Upside down'],
+                  [3, 'Sideways'],
+                  [1, 'Sideways ↺'],
+                ]}
+                onChange={(v) => {
+                  setTurn(v)
+                  cmd(`media rotate ${v}`)
+                }}
+              />
+            </Field>
             <Field label="Loop">
               <input
                 type="checkbox"
@@ -367,7 +424,25 @@ export function MediaDashboard() {
               onChange={(v) => setOpt('rotation', v)}
             />
           </Field>
-          <Field label="Up/down position (px from the top; -1 = centred)">
+          <Field label="Size on the screen">
+            <Choice
+              value={o.fit}
+              options={[
+                ['original', 'Actual'],
+                ['fit', 'Fit'],
+                ['cover', 'Fill (crop)'],
+                ['stretch', 'Stretch'],
+              ]}
+              onChange={(v) => setOpt('fit', v)}
+            />
+          </Field>
+          <Field label="Text above the picture (| = new line)">
+            <input value={o.top} onChange={(e) => setOpt('top', e.target.value)} className="w-56 rounded border border-neutral-300 px-2 py-0.5 text-sm" />
+          </Field>
+          <Field label="Text below the picture">
+            <input value={o.bottom} onChange={(e) => setOpt('bottom', e.target.value)} className="w-56 rounded border border-neutral-300 px-2 py-0.5 text-sm" />
+          </Field>
+          <Field label="Up/down position (px from the top; -1 = centred; Actual size only)">
             <Num value={o.y} onChange={(v) => setOpt('y', v)} min={-1} max={320} />
           </Field>
           <Field label="Loop by default">

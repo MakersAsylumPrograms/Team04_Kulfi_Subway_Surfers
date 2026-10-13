@@ -69,8 +69,8 @@ const DEFAULTS: Settings = {
   colour: 'full',
   monoThreshold: 128,
   monoInvert: false,
-  monoColour: '#00f3de', // the pet's cyan (0x079B)
-  background: '#000000',
+  monoColour: '#e53935', // the pet's red (0xE1C6)
+  background: '#ffffff', // the pet's screens are on white
   fps: 14,
   showName: true,
   nameY: 250,
@@ -1375,7 +1375,7 @@ export function PetLab() {
                 </Field>
                 <Field label="Colour">
                   <span className="flex gap-1">
-                    {['#00f3de', '#ffffff', '#ff3b30', '#ffcc00', '#34c759', '#0a84ff', '#ff2d92', '#ff9500'].map((c) => (
+                    {['#e53935', '#1c1c1c', '#00f3de', '#ffffff', '#ffcc00', '#34c759', '#0a84ff', '#ff2d92', '#ff9500'].map((c) => (
                       <button
                         key={c}
                         type="button"

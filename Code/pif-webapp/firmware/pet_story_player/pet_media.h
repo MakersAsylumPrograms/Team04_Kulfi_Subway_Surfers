@@ -4,8 +4,11 @@
 //
 //   /media/<name>.mjpeg   the video (baseline JPEGs, back to back; ffmpeg -f mjpeg makes them)
 //   /media/<name>.wav     its sound, 16-bit PCM, mono or stereo (optional)
-//   /media/<name>.cfg     settings, one per line (optional): fps=15  rotation=2  x=-1  y=-1
-//                         loop=0  offset=0   (x/y -1 = centred; offset ms, + = sound later)
+//   /media/<name>.cfg     settings, one per line (optional): fps=15  rotation=2  fit=original
+//                         x=-1  y=-1  loop=0  offset=0  top=Text above  bottom=Text below
+//                         (fit: original | fit | cover | stretch; x/y -1 = centred, used with
+//                          fit=original; offset ms, + = sound later; in top/bottom, "|" starts a
+//                          new line)
 //
 // The video is loaded into PSRAM (up to ~3.5 MB) so the card is free to stream the sound.
 // The sound is the clock: the frame on screen is the one that belongs at the sound's
@@ -13,7 +16,8 @@
 //
 // Serial commands (answers start with MEDIA…):
 //   media ls | media play <name> | media stop | media loop on|off | media fps <n>
-//   media offset <ms> | media rm <file>
+//   media offset <ms> | media rotate <0-3> | media fit original|fit|cover|stretch | media rm <file>
+//   media top <text> | media bottom <text>   (text above / below the picture; empty to clear)
 //   "PIFF" + u8 name length + name + u32 size + bytes: save a file into /media
 // While playing it reports "MEDIASTAT decode=<ms> skipped=<n> shown=<n>" every 2 s.
 #pragma once
@@ -29,8 +33,15 @@ struct MediaPlayer {
   float fps = 15;
   int x = -1, y = -1;
   uint8_t rotation = 2;
+  // How a frame sits on the screen: 0 original size, 1 fit (whole frame, bars), 2 cover (fills,
+  // edges cut off), 3 stretch (fills, shape changes).
+  uint8_t fit = 0;
+  int fw = 0, fh = 0;            // frame size
+  int32_t sxq = 65536, syq = 65536;  // scale, 16.16 fixed point (dest px per frame px)
+  int ox = 0, oy = 0;            // where the frame's top-left lands (can be off-screen for cover)
   bool loop = false;
   int32_t offsetMs = 0;
+  String top, bottom;  // text above and below the picture, drawn once (no cost per frame)
   bool playing = false;
   bool hasAudio = false;
   uint32_t t0 = 0;
@@ -39,6 +50,7 @@ struct MediaPlayer {
   uint32_t decodeUs = 0, shown = 0, skipped = 0, statAt = 0;
 };
 MediaPlayer media;
+static const char* const FIT_NAMES[] = { "original", "fit", "cover", "stretch" };
 
 // Sound side, run by the audio task (pet_story_player.ino), which owns the codec.
 volatile bool mediaAudioOn = false;
@@ -124,6 +136,39 @@ static bool mediaOpenWav(const String& path) {
   return true;
 }
 
+bool mediaPlay(const String& name);  // below
+void mediaTick();
+
+// The startup video: /media/startup.mjpeg (+ startup.wav, startup.cfg) plays once at power-on,
+// before anything else. Returns when it's over (10 s at most); false if there isn't one.
+bool mediaStartup() {
+#if PET_SCREEN_OLED
+  return false;
+#else
+  if (!SD.exists(String(MEDIA_DIR) + "/startup.mjpeg")) return false;
+  if (!mediaPlay("startup")) return false;
+  media.loop = false;
+  uint32_t t0 = millis();
+  while (media.playing && millis() - t0 < 10000) {
+    mediaTick();
+    delay(1);
+  }
+  mediaFree();
+  return true;
+#endif
+}
+
+// Plays a WAV on its own, with no picture (the startup sound). Quietly does nothing if the
+// file isn't on the card. Uses the same path as a video's sound.
+void mediaPlaySound(const String& path) {
+  if (media.playing || !SD.exists(path)) return;
+  if (!mediaOpenWav(path)) return;
+  media.hasAudio = true;
+  media.offsetMs = 0;
+  mediaAudioCue(millis());
+  Serial.printf("Playing %s\n", path.c_str());
+}
+
 #if PET_SCREEN_OLED
 bool mediaPlay(const String&) {
   Serial.println("MEDIAERR video needs the TFT build");
@@ -133,18 +178,112 @@ void mediaTick() {}
 #else
 JPEGDEC jpeg;
 
+// Text in a band of the screen, centred both ways, word-wrapped; "|" starts a new line.
+static void mediaTextBlock(const String& text, int y0, int y1, const GFXfont* font, uint16_t colour, int lineH) {
+  if (!text.length() || y1 - y0 < lineH) return;
+  tft.setFont(font);
+  int maxW = tft.width() - 16;
+  int maxLines = min(6, (y1 - y0) / lineH);
+  String lines[6];
+  int n = 0;
+  int start = 0;
+  while (start <= (int)text.length() && n < maxLines) {
+    int bar = text.indexOf('|', start);
+    String para = text.substring(start, bar < 0 ? text.length() : bar);
+    para.trim();
+    String line = "";
+    int w = 0;
+    while (w <= (int)para.length() && n < maxLines) {
+      int sp = para.indexOf(' ', w);
+      String word = para.substring(w, sp < 0 ? para.length() : sp);
+      String tryLine = line.length() ? line + " " + word : word;
+      if (line.length() && textWidth(tryLine) > maxW) {
+        lines[n++] = line;
+        line = word;
+      } else {
+        line = tryLine;
+      }
+      if (sp < 0) break;
+      w = sp + 1;
+    }
+    if (line.length() && n < maxLines) lines[n++] = line;
+    if (bar < 0) break;
+    start = bar + 1;
+  }
+  int top = y0 + ((y1 - y0) - n * lineH) / 2;
+  tft.setTextColor(colour);
+  for (int i = 0; i < n; i++) {
+    tft.setCursor((tft.width() - textWidth(lines[i])) / 2, top + i * lineH + (lineH * 3) / 4);
+    tft.print(lines[i]);
+  }
+  tft.setFont(nullptr);
+}
+
+// The text above and below the picture. Only where the picture leaves room (not with cover or
+// stretch, which fill the screen).
+static void mediaDrawText() {
+  if (!media.fw) return;
+  int H = tft.height();
+  int dh = (int)(((int64_t)media.fh * media.syq) >> 16);
+  int videoTop = max(0, media.oy), videoBottom = min(H, media.oy + dh);
+  mediaTextBlock(media.top, 4, videoTop - 4, &FreeSansBold12pt7b, INK, 26);
+  mediaTextBlock(media.bottom, videoBottom + 4, H - 4, &FreeSans9pt7b, DIM, 20);
+}
+
 // JPEGDEC hands over decoded blocks; send each straight to the panel (clipped to it).
+// Works out the scale and position for the current frame size, screen size and fit mode.
+static void mediaLayout() {
+  int W = tft.width(), H = tft.height();
+  if (!media.fw || !media.fh) return;
+  float sx = 1, sy = 1;
+  if (media.fit == 1 || media.fit == 2) {
+    float a = (float)W / media.fw, b = (float)H / media.fh;
+    sx = sy = media.fit == 1 ? min(a, b) : max(a, b);
+  } else if (media.fit == 3) {
+    sx = (float)W / media.fw;
+    sy = (float)H / media.fh;
+  }
+  // Rounded up, so a frame scaled to fill the screen reaches its last row and column.
+  media.sxq = (int32_t)ceilf(sx * 65536);
+  media.syq = (int32_t)ceilf(sy * 65536);
+  int dw = (int)(media.fw * sx), dh = (int)(media.fh * sy);
+  bool placed = media.fit == 0;
+  media.ox = placed && media.x >= 0 ? media.x : (W - dw) / 2;
+  media.oy = placed && media.y >= 0 ? media.y : (H - dh) / 2;
+}
+
+// JPEGDEC hands over decoded blocks; each goes to the panel scaled and placed by mediaLayout(),
+// clipped to the screen.
 static int mediaJpegDraw(JPEGDRAW* d) {
-  int w = d->iWidthUsed, h = d->iHeight;
-  if (d->x >= tft.width() || d->y >= tft.height()) return 1;
-  if (d->x + w > tft.width()) w = tft.width() - d->x;
-  if (d->y + h > tft.height()) h = tft.height() - d->y;
+  static uint16_t line[320];
+  int W = tft.width(), H = tft.height();
+  int bw = d->iWidthUsed, bh = d->iHeight;
+  // This block's rectangle on the screen.
+  int x0 = media.ox + (int)(((int64_t)d->x * media.sxq) >> 16);
+  int x1 = media.ox + (int)(((int64_t)(d->x + bw) * media.sxq) >> 16);
+  int y0 = media.oy + (int)(((int64_t)d->y * media.syq) >> 16);
+  int y1 = media.oy + (int)(((int64_t)(d->y + bh) * media.syq) >> 16);
+  int cx0 = max(0, x0), cx1 = min(W, x1), cy0 = max(0, y0), cy1 = min(H, y1);
+  if (cx0 >= cx1 || cy0 >= cy1) return 1;
   tft.startWrite();
-  tft.setAddrWindow(d->x, d->y, w, h);
-  if (w == d->iWidth) {
-    tft.writePixels(d->pPixels, (uint32_t)w * h, true, false);
+  tft.setAddrWindow(cx0, cy0, cx1 - cx0, cy1 - cy0);
+  if (media.sxq == 65536 && media.syq == 65536) {
+    // Actual size: straight copy, row by row.
+    for (int yy = cy0; yy < cy1; yy++)
+      tft.writePixels(d->pPixels + (yy - y0) * d->iWidth + (cx0 - x0), cx1 - cx0, true, false);
   } else {
-    for (int r = 0; r < h; r++) tft.writePixels(d->pPixels + r * d->iWidth, w, true, false);
+    // Scaled: nearest pixel. (dest - origin) / scale = position in the frame.
+    for (int yy = cy0; yy < cy1; yy++) {
+      int r = (int)((((int64_t)(yy - media.oy)) << 16) / media.syq) - d->y;
+      r = constrain(r, 0, bh - 1);
+      const uint16_t* src = d->pPixels + r * d->iWidth;
+      int n = 0;
+      for (int xx = cx0; xx < cx1; xx++) {
+        int c = (int)((((int64_t)(xx - media.ox)) << 16) / media.sxq) - d->x;
+        line[n++] = src[constrain(c, 0, bw - 1)];
+      }
+      tft.writePixels(line, n, true, false);
+    }
   }
   tft.endWrite();
   return 1;
@@ -155,10 +294,7 @@ static bool mediaDecode(int idx) {
   int len = media.frames[idx + 1] - media.frames[idx];
   if (!jpeg.openRAM(p, len, mediaJpegDraw)) return false;
   jpeg.setPixelType(RGB565_LITTLE_ENDIAN);
-  int w = jpeg.getWidth(), h = jpeg.getHeight();
-  int x = media.x >= 0 ? media.x : max(0, ((int)tft.width() - w) / 2);
-  int y = media.y >= 0 ? media.y : max(0, ((int)tft.height() - h) / 2);
-  bool ok = jpeg.decode(x, y, 0);
+  bool ok = jpeg.decode(0, 0, 0);  // placement and scaling happen in mediaJpegDraw()
   jpeg.close();
   return ok;
 }
@@ -178,6 +314,11 @@ static void mediaReadCfg(const String& path) {
     else if (k == "rotation") media.rotation = v.toInt() & 3;
     else if (k == "loop") media.loop = v.toInt() != 0;
     else if (k == "offset") media.offsetMs = v.toInt();
+    else if (k == "top") media.top = v;
+    else if (k == "bottom") media.bottom = v;
+    else if (k == "fit")
+      for (uint8_t i = 0; i < 4; i++)
+        if (v == FIT_NAMES[i]) media.fit = i;
   }
   f.close();
   if (media.fps < 0.5f || media.fps > 60) media.fps = 15;
@@ -232,12 +373,16 @@ bool mediaPlay(const String& name) {
   media.hasAudio = mediaOpenWav(base + ".wav");
 
   if (tft.getRotation() != media.rotation) tft.setRotation(media.rotation);
-  tft.fillScreen(0x0000);
+  tft.fillScreen(BG);
   jpeg.openRAM(media.video, media.frames[1] - media.frames[0], mediaJpegDraw);
-  int w = jpeg.getWidth(), h = jpeg.getHeight();
+  media.fw = jpeg.getWidth();
+  media.fh = jpeg.getHeight();
   jpeg.close();
-  Serial.printf("MEDIAPLAY %s frames=%u size=%dx%d fps=%.2f audio=%d loop=%d\n", name.c_str(), media.frameCount, w, h,
-                media.fps, media.hasAudio, media.loop);
+  mediaLayout();
+  mediaDrawText();
+  Serial.printf("MEDIAPLAY %s frames=%u size=%dx%d fps=%.2f audio=%d loop=%d fit=%s rotation=%u\n", name.c_str(),
+                media.frameCount, media.fw, media.fh, media.fps, media.hasAudio, media.loop, FIT_NAMES[media.fit],
+                media.rotation);
   media.t0 = millis();
   media.lastIdx = -1;
   media.statAt = millis();
@@ -383,11 +528,46 @@ bool mediaCommand(const String& line) {
 #if !PET_SCREEN_OLED
     if (media.playing) {
       tft.setRotation(media.rotation);
-      tft.fillScreen(0x0000);
+      tft.fillScreen(BG);
+      mediaLayout();
+      mediaDrawText();
       media.lastIdx = -1;  // draw the current frame again, the new way round
     }
 #endif
     Serial.printf("MEDIAOK rotation %u (save it: rotation=%u in the video's .cfg)\n", media.rotation, media.rotation);
+  } else if (line.startsWith("media fit ")) {
+    String v = line.substring(10);
+    int found = -1;
+    for (uint8_t i = 0; i < 4; i++)
+      if (v == FIT_NAMES[i]) found = i;
+    if (found < 0) {
+      Serial.println("MEDIAERR fit is one of: original, fit, cover, stretch");
+      return true;
+    }
+    media.fit = found;
+#if !PET_SCREEN_OLED
+    if (media.playing) {
+      tft.fillScreen(BG);
+      mediaLayout();
+      mediaDrawText();
+      media.lastIdx = -1;
+    }
+#endif
+    Serial.printf("MEDIAOK fit %s (save it: fit=%s in the video's .cfg)\n", FIT_NAMES[media.fit], FIT_NAMES[media.fit]);
+  } else if (line.startsWith("media top") || line.startsWith("media bottom")) {
+    bool isTop = line.startsWith("media top");
+    String v = line.substring(isTop ? 9 : 12);
+    v.trim();
+    (isTop ? media.top : media.bottom) = v;
+#if !PET_SCREEN_OLED
+    if (media.playing) {
+      tft.fillScreen(BG);
+      mediaDrawText();
+      media.lastIdx = -1;
+    }
+#endif
+    Serial.printf("MEDIAOK %s text (save it: %s=%s in the video's .cfg)\n", isTop ? "top" : "bottom", isTop ? "top" : "bottom",
+                  v.c_str());
   } else if (line.startsWith("media rm ")) {
     String path = String(MEDIA_DIR) + "/" + line.substring(9);
     Serial.println(SD.remove(path) ? "MEDIAOK removed" : "MEDIAERR couldn't remove it");

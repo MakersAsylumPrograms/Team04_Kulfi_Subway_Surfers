@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 
 export type ThemeChoice = 'auto' | 'light' | 'dark'
-const KEY = 'pif.theme'
+// v2: everyone starts on light again (the default used to follow the phone).
+const KEY = 'pif.theme.v2'
 
 function systemDark() {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
 }
 
-/** Light, dark, or follow the phone. Remembered on this device. */
+/** Light (the default, whatever the phone is set to), dark, or follow the phone. Remembered on this device. */
 export function useTheme() {
   const [choice, setChoiceState] = useState<ThemeChoice>(() => {
     try {
@@ -16,7 +17,7 @@ export function useTheme() {
     } catch {
       // no storage
     }
-    return 'auto'
+    return 'light'
   })
   const [sysDark, setSysDark] = useState(systemDark)
 
@@ -42,8 +43,8 @@ export function useTheme() {
       // ignore
     }
   }
-  // One button cycles: follow the phone, then light, then dark.
-  const cycle = () => setChoice(choice === 'auto' ? 'light' : choice === 'light' ? 'dark' : 'auto')
+  // One button cycles: light, then dark, then follow the phone.
+  const cycle = () => setChoice(choice === 'light' ? 'dark' : choice === 'dark' ? 'auto' : 'light')
 
   return { choice, dark, cycle }
 }

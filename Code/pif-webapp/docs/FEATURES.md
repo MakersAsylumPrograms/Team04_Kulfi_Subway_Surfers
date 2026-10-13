@@ -113,8 +113,9 @@ loads into PSRAM, the sound streams from the card, and the sound is the clock (l
 skipped, so picture and sound stay together). GIF was considered: 256 colours, slower to decode,
 no sound.
 
-The dashboard lists what's on the card, plays/stops it, and changes loop, fps, sound sync and
-volume while it plays, with the pet's own report of decode time and skipped frames. "Add a video
+The dashboard lists what's on the card, plays/stops it, and changes loop, fps, sound sync,
+volume, size on the screen (actual, fit, fill/crop, stretch: the pet scales each frame as it draws
+it) and which way up while it plays, with the pet's own report of decode time and skipped frames. "Add a video
 or animation" converts a video (or a set of pictures) in the browser (width, fps, JPEG quality,
 trim, sound on/off and rate, upright/sideways, position, loop) and sends it over USB, or
 downloads the files for a card reader; the matching ffmpeg commands are shown too. Code:

@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
         name: 'Jam',
         short_name: 'Jam',
         description: 'Stories about the places you pass on your commute.',
-        theme_color: '#1c1917',
+        theme_color: '#f4f3ef',
         background_color: '#fafaf9',
         display: 'standalone',
         orientation: 'portrait',

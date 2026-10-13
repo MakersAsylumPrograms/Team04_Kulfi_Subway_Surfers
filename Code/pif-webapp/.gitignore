@@ -34,3 +34,10 @@ src/pet/crane.json
 assets/pet-boot/up-in-the-sky.mp4
 public/media/up-in-the-sky.mp4
 firmware/sd-card/media/sky*
+firmware/sd-card/media/startup.*
+firmware/sd-card/start.mp3
+firmware/sd-card/sounds/*.wav
+
+# Local files: Arduino IDE settings, sketch zips
+.theia/
+*.zip

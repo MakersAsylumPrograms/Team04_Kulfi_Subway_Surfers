@@ -18,6 +18,7 @@ struct ScreenModel {
   uint16_t positionS;
   uint32_t durationS;
   const uint8_t* face;  // current face frame (faces.h), or nullptr
+  uint8_t mood;         // FaceMood (faces.h): each mood has its own colour
 };
 
 // Which parts changed, so the TFT can redraw only those (big redraws cause audio clicks).
@@ -118,6 +119,9 @@ void screenDraw(const ScreenModel& m, uint8_t) {
 
 void screenSleep(bool sleep) { oled.setPowerSave(sleep ? 1 : 0); }
 void screenRedrawAll() {}
+void screenFadeIn() {}
+void screenSplash(const char*, uint32_t) {}
+void screenSetInvert(bool) {}
 bool screenLabFrame() {  // the lab needs the colour TFT
   Serial.println("LABERR the lab needs the TFT build");
   return false;
@@ -134,11 +138,13 @@ void screenLabEnd() {}
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#include <Preferences.h>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
 
 // The display has its own SPI bus: clock 18, data 23, CS 5, DC 22. RESET goes to the
 // board's EN/RST pin, so the screen resets with the board. (It shared the SD card's bus on
@@ -149,9 +155,36 @@ void screenLabEnd() {}
 #define TFT_CS   5
 #define TFT_DC   22
 #define TFT_RST  -1
-#define INK    0xFFFF
-#define DIM    0x8410
-#define ACCENT 0x079B
+// The pet's look: white background, near-black text, grey for secondary text, and one red
+// (the face, "NOW PLAYING", the progress bar, the connection dot). Held upright.
+#define PET_ROTATION 2   // upright (portrait, 240x320); 0 is upright the other way up
+#define BG     0xFFFF    // white
+#define INK    0x18E3    // #1C1C1C
+#define DIM    0x8C51    // #8A8A8A
+#define ACCENT 0xE1C6    // red, #E53935
+#define TRACK  0xE73C    // #E6E6E6, the empty part of the progress bar
+
+// Colours, for character and stories (all dark enough to read on white in sunlight).
+#define C_RED    0xE1C6  // #E53935
+#define C_ORANGE 0xFC60  // #FB8C00
+#define C_GREEN  0x4508  // #43A047
+#define C_TEAL   0x044F  // #00897B
+#define C_BLUE   0x1C5C  // #1E88E5
+#define C_PURPLE 0x8935  // #8E24AA
+#define C_PINK   0xD8CC  // #D81B60
+
+// Each mood has its own colour (order of FaceMood in faces.h: Angry, Annoyed, Bored,
+// Heart_Eyes, Normal, Sad, Sleepy).
+static const uint16_t MOOD_COLOUR[] = { C_RED, C_ORANGE, C_TEAL, C_PINK, C_RED, C_BLUE, C_PURPLE };
+
+// Each story gets a colour of its own, picked from its place name, so the same place is always
+// the same colour.
+static const uint16_t STORY_COLOURS[] = { C_RED, C_ORANGE, C_GREEN, C_TEAL, C_BLUE, C_PURPLE, C_PINK };
+static uint16_t storyColour(const String& place) {
+  uint32_t h = 5381;
+  for (size_t i = 0; i < place.length(); i++) h = h * 33 + (uint8_t)place[i];
+  return STORY_COLOURS[h % (sizeof(STORY_COLOURS) / sizeof(STORY_COLOURS[0]))];
+}
 
 // HSPI here, because the SD card already uses the default SPI object (on 14, 2, 15).
 SPIClass tftSpi(HSPI);
@@ -165,28 +198,70 @@ void screenBegin() {
   tft.init(240, 320);
   // The library switches colour inversion on (most ST7789 panels need it); ours doesn't,
   // and with it on, black shows white and cyan shows red.
-  tft.invertDisplay(false);
-  tft.setRotation(3);
-  tft.fillScreen(0x0000);
+  // Colour inversion: panels differ (with the wrong setting, white shows black and red shows
+  // cyan). "screen invert on|off" sets it and the pet remembers it.
+  Preferences prefs;
+  prefs.begin("pet", true);
+  tft.invertDisplay(prefs.getBool("invert", false));
+  prefs.end();
+  tft.setRotation(PET_ROTATION);
+  tft.fillScreen(0x0000);  // black while it starts; screenFadeIn() brings up the white
 }
 
-// Two screens, landscape 320x240:
-//
-//   Pet (between stories): the face, 198x155 at the top, and under it two centred lines,
-//   the place (white) and a status or the title (grey). Mood comes from the sketch.
-//
-//   Story (while a story plays or is paused): no face. "NOW PLAYING" in cyan, the place
-//   large, the title under it, then a progress bar with elapsed and total time.
-//
-// A cyan dot in the top-right corner shows the phone is connected.
-#define FACE_X ((320 - FACE_W) / 2)
-#define FACE_Y 4
-#define TRACK  0x2104  // the empty part of the progress bar
+void screenSetInvert(bool on) {
+  Preferences prefs;
+  prefs.begin("pet", false);
+  prefs.putBool("invert", on);
+  prefs.end();
+  tft.invertDisplay(on);
+}
 
-static void drawFace(const uint8_t* frame) {
-  // Rows of run lengths: dark, lit, dark, lit … (see faces.h)
-  // Drawn in slices of 16 rows: the bus is shared with the SD card, and letting go between
-  // slices lets the audio task keep reading the story so it doesn't click.
+// After the startup video: a dark screen, then the name, bold and white, centred on the upright
+// screen, held for ms. The fade to white follows.
+void screenSplash(const char* name, uint32_t ms) {
+  tft.setRotation(PET_ROTATION);
+  tft.fillScreen(0x0000);
+  delay(200);  // a beat of dark screen
+  tft.setFont(&FreeSansBold24pt7b);
+  tft.setTextColor(0xFFFF);
+  int16_t x1, y1;
+  uint16_t w, h;
+  tft.getTextBounds(name, 0, 0, &x1, &y1, &w, &h);
+  tft.setCursor((tft.width() - w) / 2 - x1, (tft.height() - h) / 2 - y1);
+  tft.print(name);
+  tft.setFont(nullptr);
+  delay(ms);
+}
+
+// After startup: from black, fade up to the white background (the backlight is wired straight
+// to 3.3 V, so the picture fades rather than the light).
+void screenFadeIn() {
+  const int steps = 12;
+  for (int i = 1; i <= steps; i++) {
+    uint8_t v = 255 * i / steps;
+    tft.fillScreen(((v & 0xF8) << 8) | ((v & 0xFC) << 3) | (v >> 3));
+    delay(15);
+  }
+}
+
+// Two screens, upright 240x320, on white:
+//
+//   Pet (between stories): "Jam" and the connection dot along the top, the face (198x155) in
+//   the middle, and under it the place (bold) and a status or the title (grey).
+//
+//   Story (while a story plays or is paused): "NOW PLAYING" (red) or "PAUSED" (grey), the place
+//   large, the title under it, then a progress bar with elapsed and total time at the bottom.
+//
+// The dot in the top-right corner is red while the phone is connected, light grey when not.
+#define SCREEN_W 240
+#define SCREEN_H 320
+#define MARGIN 16
+#define FACE_X ((SCREEN_W - FACE_W) / 2)
+#define FACE_Y 46
+
+static void drawFace(const uint8_t* frame, uint16_t colour) {
+  // Rows of run lengths: background, lit, background, lit … (see faces.h). Drawn in slices
+  // of 16 rows, letting go of the bus between them so nothing else waits long.
   const uint8_t* p = frame;
   tft.startWrite();
   for (int y = 0; y < FACE_H; y++) {
@@ -198,7 +273,7 @@ static void drawFace(const uint8_t* frame) {
     bool lit = false;
     while (x < FACE_W) {
       uint8_t len = pgm_read_byte(p++);
-      if (len) tft.writeFastHLine(FACE_X + x, FACE_Y + y, len, lit ? ACCENT : 0x0000);
+      if (len) tft.writeFastHLine(FACE_X + x, FACE_Y + y, len, lit ? colour : BG);
       x += len;
       lit = !lit;
     }
@@ -223,14 +298,15 @@ static String fitLine(String t, int maxW) {
 static void centred(const GFXfont* font, const String& t, int baseline, uint16_t color) {
   tft.setFont(font);
   tft.setTextColor(color);
-  String line = fitLine(t, 300);
-  tft.setCursor((320 - textWidth(line)) / 2, baseline);
+  String line = fitLine(t, tft.width() - 2 * MARGIN);
+  tft.setCursor((tft.width() - textWidth(line)) / 2, baseline);
   tft.print(line);
 }
 
-// Word-wraps text into at most maxLines lines from (x, baseline); returns the next baseline.
+// Word-wraps text into at most maxLines lines; returns the next baseline. centre = each line
+// centred on the screen (x is then ignored).
 static int wrapped(const GFXfont* font, const String& text, int x, int baseline, int maxW, int lineH,
-                   int maxLines, uint16_t color) {
+                   int maxLines, uint16_t color, bool centre = false) {
   tft.setFont(font);
   tft.setTextColor(color);
   int start = 0, lines = 0;
@@ -248,8 +324,9 @@ static int wrapped(const GFXfont* font, const String& text, int x, int baseline,
     if (best < 0) best = text.indexOf(' ', start) < 0 ? text.length() : text.indexOf(' ', start);
     String line = text.substring(start, best);
     bool last = lines == maxLines - 1 && best < (int)text.length();
-    tft.setCursor(x, baseline);
-    tft.print(last ? fitLine(line + " " + text.substring(best + 1), maxW) : fitLine(line, maxW));
+    String shown = last ? fitLine(line + " " + text.substring(best + 1), maxW) : fitLine(line, maxW);
+    tft.setCursor(centre ? (tft.width() - textWidth(shown)) / 2 : x, baseline);
+    tft.print(shown);
     baseline += lineH;
     lines++;
     start = best + 1;
@@ -267,55 +344,79 @@ static int lastStory = -1;  // -1: next draw clears the screen and draws everyth
 
 void screenRedrawAll() { lastStory = -1; }
 
+// The top bar: "Jam" on the left, the connection dot on the right.
+static void drawTopBar(bool connected, bool wordmark, uint16_t dotOn = C_GREEN, uint16_t dotOff = TRACK) {
+  if (wordmark) {
+    // "Jam", one colour per letter: the object's name, not just its face.
+    static const uint16_t letters[] = { C_RED, C_ORANGE, C_BLUE };
+    tft.setFont(&FreeSansBold18pt7b);
+    tft.setCursor(MARGIN, 36);
+    const char* word = "Jam";
+    for (int i = 0; i < 3; i++) {
+      tft.setTextColor(letters[i]);
+      tft.print(word[i]);
+    }
+  }
+  tft.fillCircle(SCREEN_W - MARGIN - 4, 22, 5, connected ? dotOn : dotOff);
+}
+
 void screenDraw(const ScreenModel& m, uint8_t parts) {
   bool story = m.state == 1 || m.state == 2;  // playing or paused
+  bool paused = m.state == 2;
   if ((int)story != lastStory) {
     lastStory = story;
-    tft.fillScreen(0x0000);
+    tft.fillScreen(BG);
     parts = PART_ALL;
   }
 
-  if (parts & PART_STATUS) tft.fillCircle(308, 10, 4, m.connected ? ACCENT : DIM);
-
+  uint16_t colour = storyColour(m.place);
   if (story) {
-    if (parts & (PART_TEXT | PART_PROGRESS)) {
-      tft.fillRect(0, 4, 296, 22, 0x0000);
+    if (parts & (PART_TEXT | PART_PROGRESS | PART_STATUS)) {
+      // A band in the story's colour (grey when paused), with the label and the dot on it.
+      uint16_t band = paused ? DIM : colour;
+      tft.fillRect(0, 0, SCREEN_W, 46, band);
       tft.setFont(&FreeSansBold9pt7b);
-      tft.setTextColor(m.state == 2 ? DIM : ACCENT);
-      tft.setCursor(20, 22);
-      tft.print(m.state == 2 ? "PAUSED" : "NOW PLAYING");
+      tft.setTextColor(BG);
+      tft.setCursor(MARGIN, 29);
+      tft.print(paused ? "PAUSED" : "NOW PLAYING");
+      drawTopBar(m.connected, false, BG, band == DIM ? TRACK : DIM);
     }
     if (parts & PART_TEXT) {
-      tft.fillRect(0, 30, 320, 160, 0x0000);
-      int next = wrapped(&FreeSansBold18pt7b, m.place, 20, 66, 280, 34, 2, INK);
-      wrapped(&FreeSans12pt7b, m.title, 20, next + 4, 280, 24, 3, DIM);
+      tft.fillRect(0, 46, SCREEN_W, 216, BG);
+      int next = wrapped(&FreeSansBold18pt7b, m.place, MARGIN, 82, SCREEN_W - 2 * MARGIN, 34, 3, INK);
+      wrapped(&FreeSans12pt7b, m.title, MARGIN, next + 8, SCREEN_W - 2 * MARGIN, 24, 4, DIM);
     }
     if (parts & PART_PROGRESS) {
-      int w = m.durationS ? (int)(280L * m.positionS / m.durationS) : 0;
-      tft.fillRect(20, 196, 280, 6, TRACK);
-      tft.fillRect(20, 196, min(w, 280), 6, m.state == 2 ? DIM : ACCENT);
-      tft.fillRect(0, 208, 320, 32, 0x0000);
+      int barW = SCREEN_W - 2 * MARGIN;
+      int w = m.durationS ? (int)((long)barW * m.positionS / m.durationS) : 0;
+      w = min(max(w, 0), barW);
+      tft.fillRoundRect(MARGIN, 270, barW, 6, 3, TRACK);
+      if (w > 0) tft.fillRoundRect(MARGIN, 270, max(w, 6), 6, 3, paused ? DIM : colour);
+      tft.fillRect(0, 282, SCREEN_W, 38, BG);
       tft.setFont(&FreeSans9pt7b);
       tft.setTextColor(DIM);
-      tft.setCursor(20, 226);
+      tft.setCursor(MARGIN, 302);
       tft.print(clock(m.positionS));
       String total = clock(m.durationS);
-      tft.setCursor(300 - textWidth(total), 226);
+      tft.setCursor(SCREEN_W - MARGIN - textWidth(total), 302);
       tft.print(total);
     }
   } else {
+    if (parts & PART_STATUS) drawTopBar(m.connected, false);
     if (parts & PART_FACE) {
-      if (m.face) drawFace(m.face);
-      else tft.fillRect(FACE_X, FACE_Y, FACE_W, FACE_H, 0x0000);
+      if (m.face) drawFace(m.face, MOOD_COLOUR[m.mood < 7 ? m.mood : 4]);
+      else tft.fillRect(FACE_X, FACE_Y, FACE_W, FACE_H, BG);
     }
     if (parts & (PART_TEXT | PART_PROGRESS)) {
-      tft.fillRect(0, FACE_Y + FACE_H + 2, 320, 240 - (FACE_Y + FACE_H + 2), 0x0000);
+      int top = FACE_Y + FACE_H + 4;
+      tft.fillRect(0, top, SCREEN_W, SCREEN_H - top, BG);
       if (m.place.length() == 0) {
-        centred(&FreeSans12pt7b, m.connected ? "Connected" : "Waiting for your phone", 196, DIM);
+        wrapped(&FreeSans12pt7b, m.connected ? "Connected" : "Waiting for your phone", 0, 248,
+                SCREEN_W - 2 * MARGIN, 26, 2, DIM, true);
       } else {
-        centred(&FreeSansBold12pt7b, m.place, 190, INK);
+        int next = wrapped(&FreeSansBold12pt7b, m.place, 0, 244, SCREEN_W - 2 * MARGIN, 26, 2, INK, true);
         String line2 = m.state == 3 ? String("Not on the SD card: the phone plays it") : m.title;
-        if (line2.length()) centred(&FreeSans9pt7b, line2, 216, DIM);
+        if (line2.length()) wrapped(&FreeSans9pt7b, line2, 0, next + 2, SCREEN_W - 2 * MARGIN, 20, 2, DIM, true);
       }
     }
   }
@@ -375,8 +476,8 @@ bool screenLabFrame() {
 
 // Back to the pet's own screens.
 void screenLabEnd() {
-  tft.setRotation(3);
-  tft.fillScreen(0x0000);
+  tft.setRotation(PET_ROTATION);
+  tft.fillScreen(BG);
   lastStory = -1;
 }
 

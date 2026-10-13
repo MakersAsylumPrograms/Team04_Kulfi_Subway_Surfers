@@ -3,15 +3,39 @@ import type { FakePet, FakePetDisplay } from './fakePet'
 import faces from './faces.json'
 import { InputEvent, PlaybackState } from './protocol'
 
-// A pixel-for-pixel stand-in for the pet's 320x240 screen, so faces, arrivals and story
+// A pixel-for-pixel stand-in for the pet's 240x320 screen (upright), so faces, arrivals and story
 // screens can be checked in the browser before flashing. Mirrors firmware/pet_story_player
 // (pet_screen.h for the layout, the mood rules in pet_story_player.ino). Change both together.
 
-const W = 320
-const H = 240
+const W = 240
+const H = 320
+const MARGIN = 16
 const FACE_X = Math.floor((W - faces.width) / 2)
-const FACE_Y = 4
-const TRACK = '#202020' // the firmware's 0x2104
+const FACE_Y = 46
+// The firmware's colours (pet_screen.h): white, near-black, grey, one red.
+const BG = '#ffffff'
+const INK = '#1c1c1c'
+const DIM = '#8a8a8a'
+const RED = '#e53935'
+const TRACK = '#e6e6e6'
+// Colours for character and stories (the firmware's C_* in pet_screen.h).
+const C = { red: '#e53935', orange: '#fb8c00', green: '#43a047', teal: '#00897b', blue: '#1e88e5', purple: '#8e24aa', pink: '#d81b60' }
+const MOOD_COLOUR: Record<string, string> = {
+  Angry: C.red,
+  Annoyed: C.orange,
+  Bored: C.teal,
+  Heart_Eyes: C.pink,
+  Normal: C.red,
+  Sad: C.blue,
+  Sleepy: C.purple,
+}
+const STORY_COLOURS = [C.red, C.orange, C.green, C.teal, C.blue, C.purple, C.pink]
+/** The same hash as the firmware's storyColour(): a place is always the same colour. */
+function storyColour(place: string) {
+  let h = 5381
+  for (const b of new TextEncoder().encode(place)) h = (Math.imul(h, 33) + b) >>> 0
+  return STORY_COLOURS[h % STORY_COLOURS.length]
+}
 // The firmware uses Adafruit's FreeSans fonts; Arial is close in a browser.
 const FONT = {
   label: 'bold 13px Arial, Helvetica, sans-serif', // FreeSansBold9pt
@@ -20,8 +44,6 @@ const FONT = {
   caption: 'bold 17px Arial, Helvetica, sans-serif', // FreeSansBold12pt
   small: '13px Arial, Helvetica, sans-serif', // FreeSans9pt
 }
-const CYAN = '#00f0d8' // the firmware's 0x079B
-const DIM = '#848284' // 0x8410
 const BORED_AFTER_MS = 120_000
 const SLEEPY_AFTER_MS = 240_000
 const SCREEN_OFF_MS = 360_000
@@ -41,9 +63,9 @@ function moodNow(d: FakePetDisplay, now: number): Mood | 'off' {
   return 'Normal'
 }
 
-function drawFace(ctx: CanvasRenderingContext2D, frame: number[]) {
+function drawFace(ctx: CanvasRenderingContext2D, frame: number[], colour: string) {
   let i = 0
-  ctx.fillStyle = CYAN
+  ctx.fillStyle = colour
   for (let y = 0; y < faces.height; y++) {
     let x = 0
     let lit = false
@@ -62,14 +84,6 @@ function fitLine(ctx: CanvasRenderingContext2D, t: string, maxW: number) {
   return t + '...'
 }
 
-function centred(ctx: CanvasRenderingContext2D, font: string, t: string, baseline: number, color: string) {
-  ctx.font = font
-  ctx.fillStyle = color
-  ctx.textBaseline = 'alphabetic'
-  const line = fitLine(ctx, t, 300)
-  ctx.fillText(line, (W - ctx.measureText(line).width) / 2, baseline)
-}
-
 // Same word-wrap as the firmware's wrapped(): at most maxLines, the last one cut with "...".
 function wrapped(
   ctx: CanvasRenderingContext2D,
@@ -81,6 +95,7 @@ function wrapped(
   lineH: number,
   maxLines: number,
   color: string,
+  centre = false,
 ) {
   ctx.font = font
   ctx.fillStyle = color
@@ -91,7 +106,8 @@ function wrapped(
     let line = words.shift()!
     while (words.length && ctx.measureText(line + ' ' + words[0]).width <= maxW) line += ' ' + words.shift()
     if (lines === maxLines - 1 && words.length) line = line + ' ' + words.join(' ')
-    ctx.fillText(fitLine(ctx, line, maxW), x, baseline)
+    const shown = fitLine(ctx, line, maxW)
+    ctx.fillText(shown, centre ? (W - ctx.measureText(shown).width) / 2 : x, baseline)
     baseline += lineH
     lines++
   }
@@ -138,7 +154,7 @@ export function FakePetPanel({ pet }: { pet: FakePet }) {
         nextBlink = t + 2500
         setMood(m)
       }
-      ctx.fillStyle = '#000'
+      ctx.fillStyle = m === 'off' ? '#000' : BG
       ctx.fillRect(0, 0, W, H)
       if (m === 'off') return
       const frames = faces.moods[m]
@@ -160,39 +176,55 @@ export function FakePetPanel({ pet }: { pet: FakePet }) {
         frameAt = t
         frame = (frame + 1) % frames.length
       }
-      // status dot: connected (the fake pet always is)
-      ctx.fillStyle = CYAN
-      ctx.beginPath()
-      ctx.arc(308, 10, 4, 0, Math.PI * 2)
-      ctx.fill()
-
       const story = d.state === PlaybackState.playing || d.state === PlaybackState.paused
+      const colour = storyColour(d.place)
+      if (!story) {
+        // The connection dot (the fake pet always is). The name is shown at startup, not here.
+        ctx.fillStyle = C.green
+        ctx.beginPath()
+        ctx.arc(W - MARGIN - 4, 22, 5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
       if (story) {
         // Story screen: no face.
         const paused = d.state === PlaybackState.paused
+        // A band in the story's colour (grey when paused), with the label and the dot.
+        ctx.fillStyle = paused ? DIM : colour
+        ctx.fillRect(0, 0, W, 46)
         ctx.font = FONT.label
-        ctx.fillStyle = paused ? DIM : CYAN
-        ctx.fillText(paused ? 'PAUSED' : 'NOW PLAYING', 20, 22)
-        const next = wrapped(ctx, FONT.place, d.place, 20, 66, 280, 34, 2, '#fff')
-        wrapped(ctx, FONT.title, d.title, 20, next + 4, 280, 24, 3, DIM)
-        const w = d.durationS ? Math.min(280, (280 * d.positionS) / d.durationS) : 0
+        ctx.fillStyle = BG
+        ctx.fillText(paused ? 'PAUSED' : 'NOW PLAYING', MARGIN, 29)
+        ctx.beginPath()
+        ctx.arc(W - MARGIN - 4, 22, 5, 0, Math.PI * 2)
+        ctx.fill()
+        const next = wrapped(ctx, FONT.place, d.place, MARGIN, 82, W - 2 * MARGIN, 34, 3, INK)
+        wrapped(ctx, FONT.title, d.title, MARGIN, next + 8, W - 2 * MARGIN, 24, 4, DIM)
+        const barW = W - 2 * MARGIN
+        const w = d.durationS ? Math.min(barW, (barW * d.positionS) / d.durationS) : 0
         ctx.fillStyle = TRACK
-        ctx.fillRect(20, 196, 280, 6)
-        ctx.fillStyle = paused ? DIM : CYAN
-        ctx.fillRect(20, 196, w, 6)
+        ctx.beginPath()
+        ctx.roundRect(MARGIN, 270, barW, 6, 3)
+        ctx.fill()
+        if (w > 0) {
+          ctx.fillStyle = paused ? DIM : colour
+          ctx.beginPath()
+          ctx.roundRect(MARGIN, 270, Math.max(w, 6), 6, 3)
+          ctx.fill()
+        }
         ctx.font = FONT.small
         ctx.fillStyle = DIM
-        ctx.fillText(clock(d.positionS), 20, 226)
+        ctx.fillText(clock(d.positionS), MARGIN, 302)
         const total = clock(d.durationS)
-        ctx.fillText(total, 300 - ctx.measureText(total).width, 226)
+        ctx.fillText(total, W - MARGIN - ctx.measureText(total).width, 302)
       } else {
-        // Pet screen: the face and a caption.
-        drawFace(ctx, frames[frame])
-        if (!d.place) centred(ctx, FONT.title, 'Connected', 196, DIM)
+        // Pet screen: the face, then the place and a status line.
+        drawFace(ctx, frames[frame], MOOD_COLOUR[m] ?? RED)
+        if (!d.place) wrapped(ctx, FONT.title, 'Connected', 0, 248, W - 2 * MARGIN, 26, 2, DIM, true)
         else {
-          centred(ctx, FONT.caption, d.place, 190, '#fff')
+          const next = wrapped(ctx, FONT.caption, d.place, 0, 244, W - 2 * MARGIN, 26, 2, INK, true)
           const line2 = d.state === PlaybackState.missingFile ? 'Not on the SD card: the phone plays it' : d.title
-          if (line2) centred(ctx, FONT.small, line2, 216, DIM)
+          if (line2) wrapped(ctx, FONT.small, line2, 0, next + 2, W - 2 * MARGIN, 20, 2, DIM, true)
         }
       }
     }
@@ -203,14 +235,14 @@ export function FakePetPanel({ pet }: { pet: FakePet }) {
   return (
     <section className="rounded-2xl border border-stone-200 bg-white p-4" aria-label="Fake pet">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-stone-500">Pet screen (simulated, 320×240)</p>
+        <p className="text-sm font-medium text-stone-500">Pet screen (simulated, 240×320)</p>
         <p className="text-xs text-stone-500">{mood === 'off' ? 'screen off' : mood}</p>
       </div>
       <canvas
         ref={canvasRef}
         width={W}
         height={H}
-        className="mt-2 w-full rounded-lg bg-black"
+        className="mx-auto mt-2 block w-full max-w-[240px] rounded-lg border border-stone-200 bg-white"
         style={{ imageRendering: 'pixelated', aspectRatio: `${W} / ${H}` }}
         aria-label="Simulated pet display"
       />

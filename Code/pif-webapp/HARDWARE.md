@@ -274,10 +274,16 @@ What the screen shows (`pet_screen.h`):
 | Story | "NOW PLAYING" / "PAUSED", place, title, progress bar, times | BLE `play` from the browser |
 | Lab / media | Whatever the pet screen lab or a `/media` video draws | USB from the lab or dashboard |
 
+Look (since 2026-10-07): upright 240×320 (`PET_ROTATION 2`), white background, near-black text and
+grey secondary text, plus colour: a three-colour **Jam** wordmark between stories (the object is Jam,
+the face is its character), a colour per mood (Normal and Angry red, Annoyed orange, Bored teal,
+Heart_Eyes pink, Sad blue, Sleepy purple), and a colour per story (from its place name) for the
+band at the top and the progress bar. No face during a story. At power-on the screen is black, then
+fades up to white. Colour inversion is set with `screen invert on|off` and remembered. `/debug`'s
+simulated screen mirrors all of it.
+
 Moods: Normal (blinks), Heart_Eyes on arrival or a pat, Sad on disconnect or a missing file,
-Bored after 2 min, Sleepy after 4, screen off after 6. Portrait (240×320, `setRotation(2)`)
-is the planned way to hold it; the pet's own screens are still laid out landscape, and the
-portrait designs live in the lab (`/lab`) until they're ported.
+Bored after 2 min, Sleepy after 4, screen off after 6. 
 
 ### BLE — pet is the peripheral
 

@@ -142,7 +142,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
         fillColor: color,
         fillOpacity: playing ? 0.2 : heard ? 0.12 : 0.05,
       })
-        .bindTooltip(story.place, { permanent: true, direction: 'center', className: 'pif-story-label' })
+        .bindTooltip(story.title, { permanent: true, direction: 'center', className: 'pif-story-label' })
         .addTo(group)
     }
   }, [stories, revealed, heardIds, playingId, palette])

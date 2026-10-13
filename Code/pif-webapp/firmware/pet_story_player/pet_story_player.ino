@@ -255,6 +255,11 @@ void audioTask(void*) {
       }
       uint32_t used = mediaAudioFrom + mediaAudioPlayed;
       uint32_t left = mediaWavLen > used ? mediaWavLen - used : 0;
+      if (!left && !media.playing) {  // a sound on its own (the startup sound) has finished
+        mediaAudioOn = false;
+        mediaAudioBusy = false;
+        continue;
+      }
       if ((int32_t)(millis() - mediaAudioStartAt) >= 0 && left) {
         static uint8_t mbuf[2048];
         int r = mediaWav.read(mbuf, left < sizeof(mbuf) ? left : sizeof(mbuf));
@@ -461,6 +466,15 @@ void setup() {
   // 4. Audio on its own task, above loop()'s priority, so screen drawing can't starve it.
   xTaskCreatePinnedToCore(audioTask, "audio", 8192, nullptr, 3, nullptr, 1);
 
+  // 5. Startup: the startup video with its sound (/media/startup.mjpeg + .wav), or if the card
+  //    has no video, just the startup sound (/sounds/startup.wav).
+  if (!mediaStartup()) mediaPlaySound("/sounds/startup.wav");
+
+  // 6. Then a dark screen, the name (under a second), and the white fades in to the pet's screen.
+  screenSplash("JAM", 700);
+  screenFadeIn();
+  screenRedrawAll();
+
   Serial.println("Ready. Type help for the commands.");
 }
 
@@ -516,6 +530,10 @@ void printHelp() {
     "  media fps <n>        speed while playing, e.g. media fps 10\n"
     "  media offset <ms>    sound sync, + = sound later, e.g. media offset 120\n"
     "  media rotate <0-3>   turn the picture: 0 or 2 upright, 1 or 3 sideways\n"
+    "  media fit <mode>     original (actual size) | fit (whole picture, bars) |\n"
+    "                       cover (fills the screen, edges cut off) | stretch (fills, shape changes)\n"
+    "  media top <text>     text above the picture (| starts a new line; nothing after = clear)\n"
+    "  media bottom <text>  text below the picture\n"
     "  media rm <file>      delete, e.g. media rm sky.mjpeg\n"
     "  (while a video plays, MEDIASTAT lines say how long a frame takes and how many were skipped)\n"
     "\nSound:\n"
@@ -524,6 +542,7 @@ void printHelp() {
     "\nScreen and pet:\n"
     "  mood <0-6>           show a face for 5 s: 0 Angry 1 Annoyed 2 Bored 3 Heart_Eyes 4 Normal 5 Sad 6 Sleepy\n"
     "  screen               restart the screen (if it goes white)\n"
+    "  screen invert on|off colours look like a negative (white shows black)? flip this; remembered\n"
     "  lab spi <hz>         display speed, e.g. lab spi 40000000 (back to 20 MHz on restart)\n"
     "  s                    status: phone connected, playing, position\n"
     "  p | d                pretend a pat / double-pat (sent to the phone)\n");
@@ -650,6 +669,21 @@ void keyHold(int i) {
 }
 
 void readKeys(uint32_t now) {
+  // KEY1 + KEY3 held together for 3 s: restart, like the RST button (which a case hides).
+  // While both are down, neither key's own tap or hold counts.
+  static uint32_t comboAt = 0;
+  if (keyIsDown(KEY_POWER) && keyIsDown(KEY_STORY)) {
+    if (!comboAt) comboAt = now;
+    petKeys[KEY_POWER].held = petKeys[KEY_STORY].held = true;
+    petKeys[KEY_STORY].tapAt = 0;
+    if (now - comboAt > 3000) {
+      Serial.println("Restarting (KEY1 + KEY3)");
+      delay(50);
+      ESP.restart();
+    }
+  } else {
+    comboAt = 0;
+  }
   for (int i = 0; i < KEY_COUNT; i++) {
     PetKey& k = petKeys[i];
     bool down = keyIsDown(i);
@@ -695,6 +729,11 @@ void runCommand(String line) {
   } else if (line == "p") notifyInput(INPUT_PAT);
   else if (line == "d") notifyInput(INPUT_DOUBLE_PAT);
   else if (line == "screen") screenReinit = true;
+  else if (line == "screen invert on" || line == "screen invert off") {
+    screenSetInvert(line.endsWith("on"));
+    screenRedrawAll();  // the next draw clears the screen and draws everything, face included
+    Serial.printf("Colour inversion %s (remembered)\n", line.endsWith("on") ? "on" : "off");
+  }
   else if (line.startsWith("mood ")) {
     // Try a face for 5 s: 0 Angry, 1 Annoyed, 2 Bored, 3 Heart_Eyes, 4 Normal, 5 Sad, 6 Sleepy
     int mood = constrain(line.substring(5).toInt(), 0, FACE_ANIMATION_COUNT - 1);
@@ -911,7 +950,7 @@ void loop() {
     parts = PART_ALL;
   }
   if (parts) {
-    ScreenModel m = { connected, shownPlace, shownTitle, (uint8_t)state, positionS(), durationS, shownFace };
+    ScreenModel m = { connected, shownPlace, shownTitle, (uint8_t)state, positionS(), durationS, shownFace, (uint8_t)faceMood };
     screenDraw(m, parts);
   }
   delay(10);

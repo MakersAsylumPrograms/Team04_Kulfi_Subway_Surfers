@@ -7,10 +7,10 @@ import faces from '../pet/faces.json'
 import { centred, drawText, textWidth, wrapped } from './gfxText'
 
 // The firmware's colours (RGB565), as the panel shows them.
-export const INK = '#ffffff' // 0xFFFF
-export const DIM = '#848284' // 0x8410
-export const ACCENT = '#00f3de' // 0x079B
-export const TRACK = '#212021' // 0x2104
+export const INK = '#1c1c1c' // 0x18E3
+export const DIM = '#8a8a8a' // 0x8C51
+export const ACCENT = '#e53935' // 0xE1C6, the pet's red
+export const TRACK = '#e6e6e6' // 0xE73C
 
 export type Mood = keyof typeof faces.moods
 

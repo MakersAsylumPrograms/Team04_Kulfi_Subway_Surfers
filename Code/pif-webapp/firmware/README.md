@@ -120,6 +120,12 @@ app. Missing file → the app plays it on the phone.
 - **Video:** `/media/<name>.mjpeg` + `.wav` + `.cfg` on the card, played by `pet_media.h`; the pet media
   dashboard (`/media` in the web app) makes, sends and plays them. Or: `node scripts/make-media.mjs <video> [name]`
   writes them to `firmware/sd-card/media/` (needs ffmpeg) to copy onto the card. `sync-test` there checks sound sync.
+  While one plays: `media fit original|fit|cover|stretch` (size on the screen) and `media rotate 0-3`;
+  `fit=` and `rotation=` in the `.cfg` make them the default.
+  Text above and below the picture: `top=…` / `bottom=…` in the `.cfg` ("|" starts a new line), or
+  `media top <text>` / `media bottom <text>` to try it. Drawn once, so it costs nothing per frame.
+- **Startup sound:** put a WAV (16-bit PCM) at `/sounds/startup.wav` on the card and the pet plays it
+  at power-on and on every wake from sleep. No file, no sound.
 
 **Serial is 921600 baud** (since 2026-10-06, for the pet screen lab): set the Serial Monitor to 921600.
 The lab at `/lab` can draw on the pet's screen over USB ("Lab mode" in `pet_screen.h`) and send it
