@@ -19,54 +19,58 @@ export function Intro(props: { onClose: () => void }) {
       aria-labelledby="intro-title"
       className="jam-intro fixed inset-0 z-[1100] overflow-y-auto"
     >
-      <div className="mx-auto flex min-h-full max-w-md flex-col px-6 pt-12 pb-8">
-        <h1 id="intro-title" className="jam-headline text-[3.4rem] leading-[0.95]">
-          You're only here because the traffic isn't moving.
-        </h1>
-
-        <div className="mt-7 space-y-5 text-lg leading-relaxed">
-          <p>
-            And that's okay. The signal at Mahim has been red for six minutes, your local is “arriving shortly”, and
-            there's only so much scrolling one thumb can take.
-          </p>
-          <p>
-            So here's a thought. While you're stuck anyway, let the city talk. Every lane you crawl past has a story: a
-            mill that became a mall, a film shot on this very bridge, a vada pav stall older than your parents. We play
-            it the moment you're near it.
-          </p>
+      {/* One column on phones; on wide screens the story on the left, how-to on the right. */}
+      <div className="mx-auto grid min-h-full max-w-md content-center gap-x-16 px-5 pt-10 pb-8 sm:max-w-xl sm:px-8 sm:pt-16 lg:max-w-6xl lg:grid-cols-[1.15fr_1fr] lg:px-12 lg:py-16">
+        <div>
+          <h1 id="intro-title" className="jam-headline jam-title">
+            You're only here because <span className="text-[var(--accent)]">the traffic isn't moving.</span>
+          </h1>
+          <div className="mt-6 space-y-5 text-lg leading-relaxed sm:text-xl">
+            <p>
+              And that's okay. The signal at Mahim has been red for six minutes, your local is “arriving shortly”, and
+              there's only so much scrolling one thumb can take.
+            </p>
+            <p>
+              So here's a thought. While you're stuck anyway, let the city talk. Every lane you crawl past has a story:
+              a mill that became a mall, a film shot on this very bridge, a vada pav stall older than your parents. We
+              play it the moment you're near it.
+            </p>
+          </div>
         </div>
 
-        <h2 className="jam-headline mt-10 text-3xl">How it works</h2>
-        <ol className="mt-3 space-y-3 text-base leading-relaxed">
-          <Step n={1}>Put your earphones in and tap Start journey.</Step>
-          <Step n={2}>
-            Keep this page open with the screen on, like a music player. Phones stop sharing location when the screen
-            sleeps, so Jam keeps it awake for you.
-          </Step>
-          <Step n={3}>When you pass a place with a story, it plays. About 40 seconds, once per journey.</Step>
-        </ol>
+        <div className="lg:self-end">
+          <h2 className="jam-headline mt-10 text-3xl sm:text-4xl lg:mt-0">How it works</h2>
+          <ol className="mt-3 space-y-3 text-base leading-relaxed sm:text-lg">
+            <Step n={1}>Put your earphones in and tap Start journey.</Step>
+            <Step n={2}>
+              Keep this page open with the screen on, like a music player. Phones stop sharing location when the
+              screen sleeps, so Jam keeps it awake for you.
+            </Step>
+            <Step n={3}>When you pass a place with a story, it plays. About 40 seconds, once per journey.</Step>
+          </ol>
 
-        <h2 className="jam-headline mt-10 text-3xl">The pet</h2>
-        <p className="mt-3 text-base leading-relaxed">
-          Jam has a small companion you can carry. It plays the stories through its own headphone jack and shows where
-          you are on its screen.{' '}
-          {hasWebBluetooth
-            ? 'If you have one, tap Pair pet on the map.'
-            : 'Pairing it needs Chrome on Android or a computer, so it isn’t available in this browser.'}{' '}
-          You don't need one: the app works fully on its own.
-        </p>
+          <h2 className="jam-headline mt-9 text-3xl sm:text-4xl">The pet</h2>
+          <p className="mt-3 text-base leading-relaxed sm:text-lg">
+            Jam has a small companion you can carry. It plays the stories through its own headphone jack and shows
+            where you are on its screen.{' '}
+            {hasWebBluetooth
+              ? 'If you have one, tap Pair pet on the map.'
+              : 'Pairing it needs Chrome on Android or a computer, so it isn’t available in this browser.'}{' '}
+            You don't need one: the app works fully on its own.
+          </p>
 
-        <p className="jam-muted mt-8 text-sm leading-relaxed">
-          No sign-up. Your location never leaves your phone.
-        </p>
+          <p className="mt-7 text-sm leading-relaxed text-[var(--muted)]">
+            No sign-up. Your location never leaves your phone.
+          </p>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="jam-cta jam-headline mt-8 w-full rounded-2xl py-4 text-3xl active:scale-[0.99]"
-        >
-          Let the city talk
-        </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="font-display mt-6 w-full rounded-2xl bg-[var(--accent)] py-5 text-xl font-bold text-[var(--on-accent)] active:scale-[0.99]"
+          >
+            Let the city talk
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -75,7 +79,7 @@ export function Intro(props: { onClose: () => void }) {
 function Step(props: { n: number; children: ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="jam-headline jam-pink w-5 shrink-0 text-2xl leading-7">{props.n}</span>
+      <span className="jam-headline w-5 shrink-0 text-2xl leading-7 text-[var(--accent)] sm:leading-8">{props.n}</span>
       <span>{props.children}</span>
     </li>
   )

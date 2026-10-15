@@ -73,10 +73,11 @@ body {
   color: var(--muted);
 }
 
-/* First-visit intro (src/product/Intro.tsx): the team's teal and pink, Bebas Neue headlines. */
+/* First-visit intro (src/product/Intro.tsx): the app's own light/dark colours, the team's
+   Bebas Neue headlines. The title scales with the screen, from a 320 px phone up to desktop. */
 .jam-intro {
-  background: #4b7a7c;
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--ink);
   font-family: 'DM Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 .jam-headline {
@@ -84,15 +85,13 @@ body {
   font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.01em;
-  color: #f7c6d0;
 }
-.jam-pink {
-  color: #f7c6d0;
+.jam-title {
+  font-size: clamp(2.6rem, 12vw, 5.75rem);
+  line-height: 0.95;
 }
-.jam-muted {
-  color: rgba(255, 255, 255, 0.75);
-}
-.jam-cta {
-  background: #f7c6d0;
-  color: #2f5254;
+@media (min-width: 1024px) {
+  .jam-title {
+    font-size: clamp(4.5rem, 6.5vw, 6.5rem);
+  }
 }
