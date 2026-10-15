@@ -72,3 +72,27 @@ body {
 .pif .leaflet-control-attribution a {
   color: var(--muted);
 }
+
+/* First-visit intro (src/product/Intro.tsx): the team's teal and pink, Bebas Neue headlines. */
+.jam-intro {
+  background: #4b7a7c;
+  color: #ffffff;
+  font-family: 'DM Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+.jam-headline {
+  font-family: 'Bebas Neue', 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: #f7c6d0;
+}
+.jam-pink {
+  color: #f7c6d0;
+}
+.jam-muted {
+  color: rgba(255, 255, 255, 0.75);
+}
+.jam-cta {
+  background: #f7c6d0;
+  color: #2f5254;
+}

@@ -7,6 +7,8 @@ import { hasWebBluetooth } from '../pet/link'
 import { usePet } from '../pet/usePet'
 import { routes } from '../position/routes'
 import type { Fix } from '../position/types'
+import { Intro } from './Intro'
+import { useIntro } from './useIntro'
 import { useTheme } from './useTheme'
 
 // What visitors see: a full-screen map with the place you're at on top and one sheet at
@@ -54,6 +56,7 @@ export function ProductApp() {
   const pet = usePet(stories)
   const journey = useJourney(stories, pet.pet)
   const previewFix = usePreviewFix()
+  const intro = useIntro()
   // Which story has its text open; a new story starts closed.
   const [readingId, setReadingId] = useState<string | null>(null)
   const heardIds = useMemo(() => new Set(journey.heard.map((s) => s.id)), [journey.heard])
@@ -97,6 +100,14 @@ export function ProductApp() {
           )}
         </div>
         <div className="pointer-events-auto flex flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={intro.show}
+            aria-label="What is Jam?"
+            className="font-display grid h-11 w-11 place-items-center rounded-full bg-[var(--surface)]/95 text-lg font-bold shadow-lg ring-1 ring-[var(--line)] backdrop-blur active:scale-95"
+          >
+            ?
+          </button>
           <button
             type="button"
             onClick={theme.cycle}
@@ -192,6 +203,8 @@ export function ProductApp() {
           />
         )}
       </section>
+
+      {intro.open && <Intro onClose={intro.close} />}
     </div>
   )
 }
