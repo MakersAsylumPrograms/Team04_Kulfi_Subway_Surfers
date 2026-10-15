@@ -20,7 +20,7 @@ import { useTheme } from './useTheme'
 
 const stories = bundledStories
 const allIds = new Set(stories.map((s) => s.id))
-const SHEET_PX = 220 // roughly how tall the bottom sheet is, to keep your dot visible above it
+const SHEET_PX = 170 // roughly how tall the bottom sheet is, to keep your dot visible above it
 
 const LIGHT: MapPalette = { heard: '#00796b', playing: '#00a896', unheard: '#5f6b6a', me: '#00a896', path: '#00796b' }
 const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', unheard: '#8a9091', me: '#00f0d8', path: '#00f0d8' }
@@ -179,10 +179,10 @@ export function ProductApp() {
         )}
 
         <section
-          className="rounded-t-3xl bg-[var(--surface)] px-5 pt-3 pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] ring-1 ring-[var(--line)]"
+          className="rounded-t-3xl bg-[var(--surface)] px-5 pt-2 pb-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] ring-1 ring-[var(--line)]"
           aria-live="polite"
         >
-          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[var(--line)]" />
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--line)]" />
 
           {!active && (
             <>
@@ -266,37 +266,35 @@ function distanceTo(fix: { lat: number; lng: number }, story: Story) {
   return haversineM(fix.lat, fix.lng, story.lat, story.lng)
 }
 
-/** The pop-up when you reach a place: listen now, or keep it for later. */
+/** The pop-up when you reach a place: one compact row, listen now or keep it for later. */
 function Offer(props: { story: Story; distance: number | null; onListen: () => void; onLater: () => void }) {
   return (
     <div
       role="alertdialog"
       aria-label={`Story nearby: ${props.story.place}`}
-      className="jam-pop mx-3 mb-3 rounded-3xl bg-[var(--surface)] p-5 shadow-[0_12px_40px_rgba(0,0,0,0.22)] ring-2 ring-[var(--accent)]"
+      className="jam-pop mx-3 mb-2 flex items-center gap-2 rounded-2xl bg-[var(--surface)] p-2.5 pl-4 shadow-[0_8px_28px_rgba(0,0,0,0.2)] ring-2 ring-[var(--accent)]"
     >
-      <p className="text-xs font-bold tracking-widest text-[var(--accent)] uppercase">
-        {props.distance !== null && props.distance > 30 ? `Story nearby · ${distance(props.distance)}` : 'Story here'}
-      </p>
-      <p className="font-display mt-1 text-2xl leading-tight font-bold">{props.story.place}</p>
-      <p className="mt-0.5 text-base leading-snug text-[var(--muted)]">
-        {props.story.title} · {Math.round(props.story.duration_s)} s
-      </p>
-      <div className="mt-4 grid grid-cols-[2fr_1fr] gap-2">
-        <button
-          type="button"
-          onClick={props.onListen}
-          className="font-display rounded-2xl bg-[var(--accent)] py-4 text-lg font-bold text-[var(--on-accent)] active:scale-[0.99]"
-        >
-          Listen
-        </button>
-        <button
-          type="button"
-          onClick={props.onLater}
-          className="rounded-2xl bg-[var(--surface-2)] py-4 text-base font-semibold ring-1 ring-[var(--line)] active:scale-[0.99]"
-        >
-          Later
-        </button>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold tracking-widest text-[var(--accent)] uppercase">
+          {props.distance !== null && props.distance > 30 ? `Story · ${distance(props.distance)}` : 'Story here'}
+        </p>
+        <p className="font-display truncate text-lg leading-tight font-bold">{props.story.place}</p>
+        <p className="truncate text-sm text-[var(--muted)]">{props.story.title}</p>
       </div>
+      <button
+        type="button"
+        onClick={props.onLater}
+        className="h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-[var(--muted)] active:scale-95"
+      >
+        Later
+      </button>
+      <button
+        type="button"
+        onClick={props.onListen}
+        className="font-display h-11 shrink-0 rounded-xl bg-[var(--accent)] px-4 text-base font-bold text-[var(--on-accent)] active:scale-95"
+      >
+        Listen
+      </button>
     </div>
   )
 }
@@ -311,7 +309,7 @@ function Queue(props: {
   onRemove: (id: string) => void
 }) {
   return (
-    <div className="mt-4 border-t border-[var(--line)] pt-3">
+    <div className="mt-3 border-t border-[var(--line)] pt-1">
       <button
         type="button"
         onClick={props.onToggle}
@@ -325,25 +323,28 @@ function Queue(props: {
         <span className="text-sm text-[var(--muted)]">{props.open ? 'Hide' : 'Show'}</span>
       </button>
       {props.open && (
-        <ul className="mt-2 max-h-[30dvh] space-y-2 overflow-y-auto">
+        <ul className="max-h-[22dvh] divide-y divide-[var(--line)] overflow-y-auto">
           {props.stories.map((st) => (
-            <li key={st.id} className="flex items-center gap-2 rounded-2xl bg-[var(--surface-2)] p-2 pl-4">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{st.place}</p>
-                <p className="truncate text-sm text-[var(--muted)]">{st.title}</p>
-              </div>
+            <li key={st.id} className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => props.onPlay(st)}
-                className="rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-[var(--on-accent)] active:scale-95"
+                aria-label={`Play ${st.place}: ${st.title}`}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left active:opacity-70"
               >
-                Play
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-[11px] text-[var(--on-accent)]">
+                  ▶
+                </span>
+                <span className="min-w-0 truncate text-sm">
+                  <span className="font-semibold">{st.place}</span>
+                  <span className="text-[var(--muted)]"> · {st.title}</span>
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => props.onRemove(st.id)}
                 aria-label={`Remove ${st.place} from the queue`}
-                className="grid h-11 w-11 place-items-center rounded-xl text-lg text-[var(--muted)] active:scale-95"
+                className="grid h-11 w-9 shrink-0 place-items-center text-lg text-[var(--muted)] active:scale-95"
               >
                 ×
               </button>
@@ -378,41 +379,41 @@ function NowPlaying(props: {
 
   return (
     <div>
-      <p className="text-xs font-bold tracking-widest text-[var(--accent)] uppercase">
+      <p className="text-[11px] font-bold tracking-widest text-[var(--accent)] uppercase">
         {props.paused ? 'Paused' : pos?.onPet ? 'Now playing on your pet' : 'Now playing'}
       </p>
-      <h2 className="font-display mt-1 text-3xl leading-tight font-bold">{props.place}</h2>
-      <p className="mt-1 text-lg leading-snug text-[var(--muted)]">{props.title}</p>
+      <h2 className="font-display truncate text-xl leading-tight font-bold">{props.place}</h2>
+      <p className="truncate text-sm text-[var(--muted)]">{props.title}</p>
 
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]">
-        <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${total ? (elapsed / total) * 100 : 0}%` }} />
-      </div>
-      <div className="mt-1 flex justify-between text-xs text-[var(--muted)] tabular-nums">
+      <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)] tabular-nums">
         <span>{clock(elapsed)}</span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+          <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${total ? (elapsed / total) * 100 : 0}%` }} />
+        </div>
         <span>{total ? clock(total) : ''}</span>
       </div>
 
       {props.reading && (
-        <div className="mt-3 max-h-[30dvh] overflow-y-auto rounded-xl bg-[var(--surface-2)] p-4 text-base leading-relaxed">
+        <div className="mt-3 max-h-[28dvh] overflow-y-auto rounded-xl bg-[var(--surface-2)] p-3 text-sm leading-relaxed">
           {props.text}
-          <a href={props.source} target="_blank" rel="noreferrer" className="mt-2 block text-sm text-[var(--muted)] underline">
+          <a href={props.source} target="_blank" rel="noreferrer" className="mt-2 block text-xs text-[var(--muted)] underline">
             Source
           </a>
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-[1fr_1fr_auto] gap-2">
+      <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
         <button
           type="button"
           onClick={props.onPause}
-          className="rounded-2xl bg-[var(--accent)] py-4 text-lg font-bold text-[var(--on-accent)] active:scale-[0.99]"
+          className="h-11 rounded-xl bg-[var(--accent)] text-base font-bold text-[var(--on-accent)] active:scale-[0.99]"
         >
           {props.paused ? 'Resume' : 'Pause'}
         </button>
         <button
           type="button"
           onClick={props.onSkip}
-          className="rounded-2xl bg-[var(--surface-2)] py-4 text-lg font-semibold ring-1 ring-[var(--line)] active:scale-[0.99]"
+          className="h-11 rounded-xl bg-[var(--surface-2)] text-base font-semibold ring-1 ring-[var(--line)] active:scale-[0.99]"
         >
           Skip
         </button>
@@ -420,7 +421,7 @@ function NowPlaying(props: {
           type="button"
           onClick={props.onRead}
           aria-pressed={props.reading}
-          className="rounded-2xl bg-[var(--surface-2)] px-4 py-4 text-base font-semibold ring-1 ring-[var(--line)] active:scale-[0.99]"
+          className="h-11 rounded-xl bg-[var(--surface-2)] px-4 text-sm font-semibold ring-1 ring-[var(--line)] active:scale-[0.99]"
         >
           {props.reading ? 'Hide' : 'Read'}
         </button>
