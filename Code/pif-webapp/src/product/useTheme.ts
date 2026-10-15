@@ -9,7 +9,7 @@ function systemDark() {
 }
 
 /** Light (the default, whatever the phone is set to), dark, or follow the phone. Remembered on this device. */
-export function useTheme() {
+export function useTheme(options: { lightOnly?: boolean } = {}) {
   const [choice, setChoiceState] = useState<ThemeChoice>(() => {
     try {
       const saved = localStorage.getItem(KEY)
@@ -29,7 +29,8 @@ export function useTheme() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  const dark = choice === 'dark' || (choice === 'auto' && sysDark)
+  // lightOnly pins light whatever was saved; the choice is kept for when the button returns.
+  const dark = !options.lightOnly && (choice === 'dark' || (choice === 'auto' && sysDark))
 
   useEffect(() => {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a0b0c' : '#f4f3ef')

@@ -57,7 +57,8 @@ function usePreviewFix(): Fix | null {
 }
 
 export function ProductApp() {
-  const theme = useTheme()
+  // Light only for now (2026-10-15). Drop lightOnly and restore the theme button below to bring dark back.
+  const theme = useTheme({ lightOnly: true })
   const pet = usePet(stories)
   const journey = useJourney(stories, pet.pet, { askFirst: true })
   const previewFix = usePreviewFix()
@@ -145,6 +146,7 @@ export function ProductApp() {
           >
             ?
           </button>
+          {/* Theme button, hidden while the app is light only:
           <button
             type="button"
             onClick={theme.cycle}
@@ -153,6 +155,7 @@ export function ProductApp() {
           >
             {theme.choice === 'auto' ? '◐' : theme.choice === 'light' ? '☼' : '☾'}
           </button>
+          */}
           {hasWebBluetooth && (
             <button
               type="button"
