@@ -64,6 +64,7 @@ For the showcase, three spots in the venue become the three story places.
 - **Themes:** light keeps the OpenStreetMap colours; dark turns the same tiles into a charcoal sketch with a CSS filter. Follows the phone by default; the top-right button cycles auto, light, dark (remembered). One accent: the pet's cyan (deeper teal on light for sunlight).
 - **Type:** Space Grotesk (Google Fonts) for place names and buttons.
 - `/debug` keeps the full testing tool.
+- **First-visit intro** (2026-10-15, `src/product/Intro.tsx`): the team's "You're only here because the traffic isn't moving" copy in teal, pink and Bebas Neue, then how it works, what the pet is (with the Android Chrome note where Bluetooth is missing) and a privacy line. Shown once per device (`pif.intro.v1`), reopened from the **?** button on the map.
 
 ## 2d. Pet screen lab at /lab (built 2026-10-06)
 
