@@ -64,6 +64,7 @@ For the showcase, three spots in the venue become the three story places.
 - **Themes:** light keeps the OpenStreetMap colours; dark turns the same tiles into a charcoal sketch with a CSS filter. Follows the phone by default; the top-right button cycles auto, light, dark (remembered). One accent: the pet's cyan (deeper teal on light for sunlight).
 - **Type:** Space Grotesk (Google Fonts) for place names and buttons.
 - `/debug` keeps the full testing tool.
+- **No Start journey (2026-10-15):** Jam starts listening for places as soon as location is allowed (otherwise one **Find stories near me** button asks). Reaching a place pops up its story with **Listen** / **Later** and a short buzz. Later, an unanswered pop-up (45 s), or a newer place moves it to the queue; places passed while a story plays join the queue and play next on their own. Queued stories play anywhere, and can be removed. Engine: `useJourney(..., { askFirst: true })`; /debug keeps the old auto-play.
 - **First-visit intro** (2026-10-15, `src/product/Intro.tsx`): the team's "You're only here because the traffic isn't moving" copy in teal, pink and Bebas Neue, then how it works, what the pet is (with the Android Chrome note where Bluetooth is missing) and a privacy line. Shown once per device (`pif.intro.v1`), reopened from the **?** button on the map.
 
 ## 2d. Pet screen lab at /lab (built 2026-10-06)

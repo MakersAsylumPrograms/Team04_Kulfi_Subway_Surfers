@@ -41,12 +41,15 @@ export function Intro(props: { onClose: () => void }) {
         <div className="lg:self-end">
           <h2 className="jam-headline mt-10 text-3xl sm:text-4xl lg:mt-0">How it works</h2>
           <ol className="mt-3 space-y-3 text-base leading-relaxed sm:text-lg">
-            <Step n={1}>Put your earphones in and tap Start journey.</Step>
+            <Step n={1}>Put your earphones in and let Jam see your location.</Step>
             <Step n={2}>
               Keep this page open with the screen on, like a music player. Phones stop sharing location when the
               screen sleeps, so Jam keeps it awake for you.
             </Step>
-            <Step n={3}>When you pass a place with a story, it plays. About 40 seconds, once per journey.</Step>
+            <Step n={3}>
+              When you reach a place with a story, it pops up. Tap Listen, or Later to keep it in your queue. Places
+              you pass while listening play next on their own.
+            </Step>
           </ol>
 
           <h2 className="jam-headline mt-9 text-3xl sm:text-4xl">The pet</h2>
@@ -59,9 +62,9 @@ export function Intro(props: { onClose: () => void }) {
             You don't need one: the app works fully on its own.
           </p>
 
-          <p className="mt-7 text-sm leading-relaxed text-[var(--muted)]">
+          {/* <p className="mt-7 text-sm leading-relaxed text-[var(--muted)]">
             No sign-up. Your location never leaves your phone.
-          </p>
+          </p> */}
 
           <button
             type="button"

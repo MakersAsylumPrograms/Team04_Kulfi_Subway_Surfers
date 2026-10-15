@@ -95,3 +95,19 @@ body {
     font-size: clamp(4.5rem, 6.5vw, 6.5rem);
   }
 }
+
+/* The story pop-up slides up from the sheet. */
+@keyframes jam-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+.jam-pop {
+  animation: jam-pop-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .jam-pop {
+    animation: none;
+  }
+}
