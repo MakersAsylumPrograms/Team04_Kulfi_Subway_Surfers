@@ -65,7 +65,6 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
   useEffect(() => {
     onStoryTapRef.current = onStoryTap
   }, [onStoryTap])
-  const fogOptionsRef = useRef(fog ? { rgb: fog.rgb, radiusM: fog.radiusM } : null)
   const fogRef = useRef<FogLayer | null>(null)
   const zoom = close ? CLOSE_ZOOM : ZOOM
   const zoomRef = useRef(zoom)
@@ -110,7 +109,6 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
             fillOpacity: 1,
           }),
     }
-    if (fogOptionsRef.current) fogRef.current = new FogLayer(fogOptionsRef.current).addTo(map)
     // Panning by hand stops the map following you until you tap Recenter.
     map.on('dragstart', () => {
       followingRef.current = false
@@ -152,11 +150,27 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     layersRef.current?.path.setLatLngs(path)
   }, [path])
 
+  // Fog can be switched on and off (the showcase has a button); its look is fixed once made.
+  const fogOn = !!fog
+  const fogLookRef = useRef(fog ? { rgb: fog.rgb, radiusM: fog.radiusM } : null)
+  useEffect(() => {
+    if (fog) fogLookRef.current = { rgb: fog.rgb, radiusM: fog.radiusM }
+  })
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !fogOn || !fogLookRef.current) return
+    const layer = new FogLayer(fogLookRef.current).addTo(map)
+    fogRef.current = layer
+    return () => {
+      layer.remove()
+      if (fogRef.current === layer) fogRef.current = null
+    }
+  }, [fogOn])
   const fogPoints = fog?.points
   const fogClearings = fog?.clearings
   useEffect(() => {
     if (fogPoints) fogRef.current?.setPoints(fogPoints, fogClearings ?? [])
-  }, [fogPoints, fogClearings])
+  }, [fogPoints, fogClearings, fogOn])
 
   // Which story circles you're standing in. Keyed as a string so the circles are only redrawn
   // when you cross a boundary, not on every fix (that would restart the arrival animation).

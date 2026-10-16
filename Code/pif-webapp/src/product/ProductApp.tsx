@@ -93,10 +93,12 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   const here = journey.here
   const [queueOpen, setQueueOpen] = useState(false)
 
-  // Fog (experiment, /showcase only; ?fog=0 turns it off there): only stories near where
-  // you've been are on the map.
-  const fogOn = FOG_ENABLED && showcase
-  const fog = useFog(fogOn ? journey.fix : null, stories, false)
+  // Fog (experiment, /showcase only, with a button to switch it; ?fog=0 starts it off): only
+  // stories near where you've been are on the map. The trail is tracked either way, so
+  // switching fog back on shows where you've already been.
+  const [fogChoice, setFogChoice] = useState(FOG_ENABLED)
+  const fogOn = fogChoice && showcase
+  const fog = useFog(showcase ? journey.fix : null, stories, false)
   const fogPoints = fog.points
   const revealed = useMemo(
     () =>
@@ -183,7 +185,7 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
             <JamWordmark className="h-7 w-auto" />
           )}
         </div>
-        <div className="pointer-events-auto flex flex-col items-end gap-2">
+        <div className="pointer-events-auto flex max-w-[7.5rem] flex-row-reverse flex-wrap items-start justify-start gap-2">
           <button
             type="button"
             onClick={intro.show}
@@ -192,6 +194,17 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           >
             ?
           </button>
+          {showcase && (
+            <button
+              type="button"
+              onClick={() => setFogChoice((on) => !on)}
+              aria-pressed={fogOn}
+              aria-label={fogOn ? 'Turn fog off' : 'Turn fog on'}
+              className={`grid h-11 w-11 place-items-center rounded-full shadow-lg ring-1 ring-[var(--line)] backdrop-blur active:scale-95 ${fogOn ? 'bg-[var(--surface)]/95 text-[var(--ink)]' : 'bg-[var(--surface)]/80 text-[var(--muted)]'}`}
+            >
+              <FogIcon on={fogOn} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setHeardOpen(true)}
@@ -367,6 +380,16 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
 
       {intro.open && <Intro onClose={intro.close} splash={intro.firstVisit} />}
     </div>
+  )
+}
+
+/** A cloud; struck through when the fog is off. */
+function FogIcon(props: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.6 4.2 4.2 0 0 0 7 18Z" />
+      {!props.on && <path d="M4 4l16 16" />}
+    </svg>
   )
 }
 
