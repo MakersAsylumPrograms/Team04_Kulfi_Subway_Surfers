@@ -124,7 +124,7 @@ app. Missing file → the app plays it on the phone.
   `fit=` and `rotation=` in the `.cfg` make them the default.
   Text above and below the picture: `top=…` / `bottom=…` in the `.cfg` ("|" starts a new line), or
   `media top <text>` / `media bottom <text>` to try it. Drawn once, so it costs nothing per frame.
-- **Startup (2026-10-16):** the mascot over "JAM" on teal fades in from black, stays 1.8 s
+- **Startup (2026-10-16):** the startup sound begins on a dark screen; 1 s later (`STARTUP_SOUND_LEAD_MS`) the mascot over "JAM" on teal fades in, stays 1.8 s
   (`STARTUP_HOLD_MS`), then fades to the white pet screen. The picture is in flash
   (`startup_image.h`), made by `node scripts/convert-startup.mjs [picture]` from
   `assets/pet-startup/startup.png` (needs ffmpeg). The startup video is gone.

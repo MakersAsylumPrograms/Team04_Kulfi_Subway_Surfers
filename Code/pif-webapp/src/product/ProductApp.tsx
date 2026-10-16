@@ -38,9 +38,9 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 const READ_KEY = 'pif.read.v1'
 const OFFER_TIMEOUT_MS = 45_000 // an unanswered pop-up slips into the queue
 const GPS_START = { source: 'gps', route: routes[0], speed: 1.4, noise: false } as const
-// About 5.5 km at 140 m/s: a ride of about 40 s. The places come faster than the stories
+// About 7.1 km at 160 m/s: a ride of about 45 s. The places come faster than the stories
 // (62 s in all), so later ones wait in the queue and play on after the ride ends.
-const RIDE_START = { source: 'simulate', route: showcaseRoute, speed: 140, noise: false } as const
+const RIDE_START = { source: 'simulate', route: showcaseRoute, speed: 160, noise: false } as const
 const RIDE_FROM: [number, number] = [showcaseRoute.points[0].lat, showcaseRoute.points[0].lng]
 const distance = (m: number) => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`)
 

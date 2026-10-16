@@ -62,11 +62,14 @@ export const routes: Route[] = [
   },
 ]
 
-/** The /showcase demo ride: Dadar, through Prabhadevi and Worli, ending at the Nehru Centre. */
+/** The /showcase demo ride: from King's Circle (outside Dadar's circle, so Dadar pops up a moment
+ * in rather than at once) to Dadar, through Prabhadevi and Worli, ending at the Nehru Centre. */
 export const showcaseRoute: Route = {
   id: 'showcase-dadar-nehru',
   name: 'Ride: Dadar to the Nehru Centre, through Worli',
   points: [
+    { name: "King's Circle", lat: 19.0275, lng: 72.855 },
+    { name: 'Dadar TT', lat: 19.0225, lng: 72.847 },
     { name: 'Dadar station', lat: 19.0183, lng: 72.8432 },
     { name: 'Ranade Road', lat: 19.02, lng: 72.8395 },
     { name: 'Gokhale Road', lat: 19.0172, lng: 72.835 },

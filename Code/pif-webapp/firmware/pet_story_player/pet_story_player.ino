@@ -61,6 +61,7 @@ enum TransportCmd : uint8_t { CMD_RESUME = 0, CMD_PAUSE = 1, CMD_STOP = 2, CMD_V
 enum InputEvent : uint8_t { INPUT_PAT = 1, INPUT_DOUBLE_PAT = 2 };
 
 #define PET_NAME "Jam Pet"
+#define STARTUP_SOUND_LEAD_MS 1000  // the startup sound starts this long before the picture
 #define STARTUP_HOLD_MS 1800  // how long the startup picture stays before fading
 
 NimBLECharacteristic* playbackChr = nullptr;
@@ -513,11 +514,12 @@ void setup() {
   // 4. Audio on its own task, above loop()'s priority, so screen drawing can't starve it.
   xTaskCreatePinnedToCore(audioTask, "audio", 8192, nullptr, 3, nullptr, 1);
 
-  // 5. Startup: the mascot and "JAM" fade in with the startup sound (/sounds/startup.wav, or
-  //    the old startup video's /media/startup.wav), stay a moment, then fade to the white of
-  //    the pet's screen.
-  screenStartup();
+  // 5. Startup: the startup sound (/sounds/startup.wav, or the old startup video's
+  //    /media/startup.wav) starts on a dark screen, the mascot and "JAM" fade in a second
+  //    later, stay a moment, then fade to the white of the pet's screen.
   mediaPlaySound(SD.exists("/sounds/startup.wav") ? "/sounds/startup.wav" : "/media/startup.wav");
+  delay(STARTUP_SOUND_LEAD_MS);
+  screenStartup();
   delay(STARTUP_HOLD_MS);
   screenStartupFadeOut();
   screenRedrawAll();
