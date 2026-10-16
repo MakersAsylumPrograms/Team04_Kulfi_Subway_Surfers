@@ -58,6 +58,30 @@ export function evaluateFix(state: TriggerState, fix: Fix, stories: readonly Sto
   return best.story
 }
 
+/**
+ * Like evaluateFix, but returns every story that qualifies on this fix, nearest first, and
+ * marks them all fired. For starting (or standing still) inside several overlapping circles:
+ * a phone that isn't moving may send no more fixes, so waiting for the next one to fire the
+ * rest would leave them unheard.
+ */
+export function evaluateFixAll(state: TriggerState, fix: Fix, stories: readonly Story[]): Story[] {
+  const inside = new Set<string>()
+  const ready: { story: Story; distance: number }[] = []
+  for (const story of stories) {
+    if (state.fired.has(story.id)) continue
+    const distance = distanceToStory(fix, story)
+    if (distance > story.radius_m) continue
+    inside.add(story.id)
+    if (state.insideLastFix.has(story.id) || fix.accuracy < story.radius_m) ready.push({ story, distance })
+  }
+  for (const { story } of ready) {
+    state.fired.add(story.id)
+    inside.delete(story.id)
+  }
+  state.insideLastFix = inside
+  return ready.sort((a, b) => a.distance - b.distance).map((r) => r.story)
+}
+
 /** The nearest story not yet fired, for the "next story" line on screen. */
 export function nearestUnfired(
   state: TriggerState,

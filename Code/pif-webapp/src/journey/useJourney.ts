@@ -13,6 +13,7 @@ import {
   createTriggerState,
   distanceToStory,
   evaluateFix,
+  evaluateFixAll,
   haversineM,
   nearestUnfired,
   placeAt,
@@ -131,7 +132,10 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
     (f: Fix) => {
       lastFixRef.current = f
       setFix(f)
-      const story = evaluateFix(triggerRef.current, f, stories)
+      // Ask-first takes every story this fix qualifies for (they queue up); auto-play takes
+      // the nearest, and the rest fire on later fixes.
+      const found = askFirst ? evaluateFixAll(triggerRef.current, f, stories) : []
+      const story = askFirst ? (found[0] ?? null) : evaluateFix(triggerRef.current, f, stories)
       nextRef.current = nearestUnfired(triggerRef.current, f, stories)
       setNext(nextRef.current)
       setHere(placeAt(f, stories, placesRef.current))
@@ -158,6 +162,8 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
           if (offerRef.current) enqueue(offerRef.current)
           setOfferNow(story)
         }
+        // Several at once (overlapping circles): the nearest is offered, the rest queue up.
+        for (const more of found.slice(1)) enqueue(more)
         return
       }
       if (nowPlayingRef.current) {
