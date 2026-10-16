@@ -360,6 +360,15 @@ void requestPlay(const String& id) {
 // or more; so on connect the pet asks for 4 s. loop() also re-checks the real connection count
 // every second (checkConnection), in case a callback was missed.
 #define LINK_TIMEOUT_10MS 400  // 4 s
+// A phone arriving: the dot turns on, the text under the face changes from "Waiting" (the app
+// follows with its own words), and the pet is pleased to see you.
+void phoneHere() {
+  connected = true;
+  statusDirty = true;
+  textDirty = true;
+  react(MOOD_HEART_EYES, 2500);
+}
+
 void phoneGone() {
   connected = false;
   statusDirty = true;
@@ -372,9 +381,7 @@ void phoneGone() {
 
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* server, NimBLEConnInfo& info) override {
-    connected = true;
-    statusDirty = true;
-    poke();
+    phoneHere();
     // 30-60 ms between packets, no skipping, gone after 4 s of silence.
     server->updateConnParams(info.getConnHandle(), 24, 48, 0, LINK_TIMEOUT_10MS);
   }
@@ -391,8 +398,7 @@ void checkConnection(uint32_t now) {
   checkedAt = now;
   bool linked = NimBLEDevice::getServer()->getConnectedCount() > 0;
   if (linked && !connected) {
-    connected = true;
-    statusDirty = true;
+    phoneHere();
   } else if (!linked && connected) {
     Serial.println("Phone gone (no link left)");
     phoneGone();
@@ -437,9 +443,16 @@ class NowShowingCallbacks : public NimBLECharacteristicCallbacks {
   }
 };
 
-// The app buzzes when you arrive at a new place: no motor yet, so the face reacts instead.
+// The app buzzes when there's a story where you are (or you arrive somewhere): no motor yet,
+// so the face lights up and the pet chimes, if the card has /sounds/story-here.wav. The chime
+// is played from loop(), which checks nothing else has the speaker.
+#define CHIME_PATH "/sounds/story-here.wav"
+volatile bool chimeRequested = false;
 class HapticCallbacks : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic*, NimBLEConnInfo&) override { react(MOOD_HEART_EYES, 3000); }
+  void onWrite(NimBLECharacteristic*, NimBLEConnInfo&) override {
+    react(MOOD_HEART_EYES, 4000);
+    chimeRequested = true;
+  }
 };
 
 ServerCallbacks serverCallbacks;
@@ -916,6 +929,10 @@ void loop() {
 
   readKeys(millis());
   checkConnection(millis());
+  if (chimeRequested) {
+    chimeRequested = false;
+    if (state != STATE_PLAYING && state != STATE_PAUSED && !media.playing && !labActive) mediaPlaySound(CHIME_PATH);
+  }
 
   static bool mediaShown = false;
   if (media.playing) {

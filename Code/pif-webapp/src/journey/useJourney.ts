@@ -72,6 +72,7 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
   const [heard, setHeard] = useState<Story[]>([])
   const [error, setError] = useState<string | null>(null)
   const [next, setNext] = useState<{ story: Story; distance: number } | null>(null)
+  const nextRef = useRef(next)
   const [here, setHere] = useState<PlaceAt | null>(null)
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set())
   const [path, setPath] = useState<[number, number][]>([])
@@ -131,7 +132,8 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
       lastFixRef.current = f
       setFix(f)
       const story = evaluateFix(triggerRef.current, f, stories)
-      setNext(nearestUnfired(triggerRef.current, f, stories))
+      nextRef.current = nearestUnfired(triggerRef.current, f, stories)
+      setNext(nextRef.current)
       setHere(placeAt(f, stories, placesRef.current))
       setRevealed((prev) => {
         const add = stories.filter((st) => !prev.has(st.id) && distanceToStory(f, st) <= REVEAL_M)
@@ -291,15 +293,6 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
     testStopRef.current = testStop
   }, [testTogglePause, testStop])
 
-  // Between stories, the pet's screen says where you are: a place name, never coordinates.
-  useEffect(() => {
-    const out = petOutputRef.current
-    if (!out || status !== 'listening') return
-    if (offer) out.showOffer(offer)
-    else if (here) out.showIdle(here.inside ? here.name : `near ${here.name}`, here.inside ? 'You are here' : 'Keep walking')
-    else out.showIdle('Listening for places', '')
-  }, [here, status, pet, offer])
-
   // Connect a pet: stories go to it from the next one on. A pat pauses or resumes,
   // a double-pat skips.
   useEffect(() => {
@@ -313,11 +306,20 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
         if (event === InputEvent.doublePat) testStopRef.current()
         return
       }
-      // A story on offer (ask-first mode): a pat listens, a double-pat is Later.
-      const offered = offerRef.current
-      if (!nowPlayingRef.current && offered) {
-        if (event === InputEvent.pat) listenRef.current(offered)
-        if (event === InputEvent.doublePat) laterRef.current()
+      // Nothing playing (ask-first mode): a pat plays the story on offer, else the first one
+      // waiting in the queue, else the pet says where the nearest story is. A double-pat on
+      // an offer is Later.
+      if (askFirst && !nowPlayingRef.current) {
+        const offered = offerRef.current
+        if (offered) {
+          if (event === InputEvent.pat) listenRef.current(offered)
+          if (event === InputEvent.doublePat) laterRef.current()
+        } else if (event === InputEvent.pat && queueRef.current.length) {
+          listenRef.current(queueRef.current[0])
+        } else if (event === InputEvent.pat && nextRef.current) {
+          const { story, distance } = nextRef.current
+          out.showIdle(story.place, `Nearest story, ${distance < 1000 ? `${Math.max(10, Math.round(distance / 10) * 10)} m` : `${(distance / 1000).toFixed(1)} km`} away`)
+        }
         return
       }
       if (event === InputEvent.pat) togglePauseRef.current()
@@ -329,6 +331,19 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
       if (petOutputRef.current === out) petOutputRef.current = null
     }
   }, [pet, player, askFirst])
+
+  // Between stories, the pet's screen says what's going on: hello before you start, where you
+  // are (a place name, never coordinates), or the story on offer. Declared after the effect
+  // above, so it runs with the new pet the moment one connects, not only once a story plays.
+  useEffect(() => {
+    const out = petOutputRef.current
+    if (!out) return
+    if (status === 'idle') out.showIdle('Hello!', 'Start Jam on your phone to find stories')
+    else if (status !== 'listening') return
+    else if (offer) out.showOffer(offer)
+    else if (here) out.showIdle(here.inside ? here.name : `near ${here.name}`, here.inside ? 'You are here' : 'Keep walking')
+    else out.showIdle('Listening for places', '')
+  }, [here, status, pet, offer])
 
   const start = useCallback(
     (s: JourneySettings) => {

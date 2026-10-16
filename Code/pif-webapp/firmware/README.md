@@ -135,7 +135,13 @@ app. Missing file → the app plays it on the phone.
   every second, so the dot goes grey and the screen goes back to waiting within about 4 s of the phone
   leaving (at once if the app is closed). It keeps playing a story it already started.
 - **Story offers (2026-10-16):** when the visitor app pops up a story, the pet shows the place with
-  "Story here. Pat me to listen" and makes heart eyes. A tap on KEY3 is Listen, a double-tap is Later.
+  "Story here. Pat me to listen", makes heart eyes and chimes (`/sounds/story-here.wav`, a two-note
+  chime in `firmware/sd-card/sounds/`; no file, no chime). A tap on KEY3 is Listen, a double-tap is
+  Later. With nothing on offer, a tap plays the first story waiting in the app's queue, or the pet
+  shows where the nearest story is.
+- **Connecting:** the pet greets the phone straight away (heart eyes, "Hello! Connected"), and the
+  app sends what it's doing at once ("Start Jam on your phone…", or where you are), not only once a
+  story plays.
 
 **Serial is 921600 baud** (since 2026-10-06, for the pet screen lab): set the Serial Monitor to 921600.
 The lab at `/lab` can draw on the pet's screen over USB ("Lab mode" in `pet_screen.h`) and send it

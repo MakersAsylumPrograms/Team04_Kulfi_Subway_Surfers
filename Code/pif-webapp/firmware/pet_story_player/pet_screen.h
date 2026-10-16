@@ -422,7 +422,7 @@ void screenDraw(const ScreenModel& m, uint8_t parts) {
       int top = FACE_Y + FACE_H + 4;
       tft.fillRect(0, top, SCREEN_W, SCREEN_H - top, BG);
       if (m.place.length() == 0) {
-        wrapped(&FreeSans12pt7b, m.connected ? "Connected" : "Waiting for your phone", 0, 248,
+        wrapped(&FreeSans12pt7b, m.connected ? "Hello! Connected" : "Waiting for your phone", 0, 248,
                 SCREEN_W - 2 * MARGIN, 26, 2, DIM, true);
       } else {
         int next = wrapped(&FreeSansBold12pt7b, m.place, 0, 244, SCREEN_W - 2 * MARGIN, 26, 2, INK, true);
