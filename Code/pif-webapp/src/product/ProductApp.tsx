@@ -81,20 +81,22 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   const here = journey.here
   const [queueOpen, setQueueOpen] = useState(false)
 
-  // Fog and locked pins (experiment, ?fog=0 turns both off): only stories near where you've
-  // been are on the map, and those you haven't heard show just their place name.
-  const fog = useFog(journey.fix, stories, !showcase)
+  // Fog and locked pins (experiment, /showcase only; ?fog=0 turns both off there): only
+  // stories near where you've been are on the map, and those you haven't heard show just
+  // their place name.
+  const fogOn = FOG_ENABLED && showcase
+  const fog = useFog(fogOn ? journey.fix : null, stories, false)
   const fogPoints = fog.points
   const revealed = useMemo(
     () =>
-      FOG_ENABLED
+      fogOn
         ? new Set(
             stories
               .filter((st) => fogPoints.some(([lat, lng]) => haversineM(lat, lng, st.lat, st.lng) <= FOG_REVEAL_M + st.radius_m))
               .map((st) => st.id),
           )
         : allIds,
-    [fogPoints],
+    [fogPoints, fogOn],
   )
 
   // If this browser already allows location, start listening for places straight away.
@@ -146,11 +148,11 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           bottomInset={SHEET_PX}
           meIcon={mascot}
           fog={
-            FOG_ENABLED
+            fogOn
               ? { points: fogPoints, clearings: fog.clearings, radiusM: FOG_REVEAL_M, rgb: theme.dark ? [24, 26, 28] : [228, 230, 232] }
               : undefined
           }
-          lockedLabels={FOG_ENABLED}
+          lockedLabels={fogOn}
         />
       </div>
 

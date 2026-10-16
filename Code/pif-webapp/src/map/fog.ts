@@ -16,11 +16,19 @@ export interface FogOptions {
 export type FogClearing = [number, number, number]
 
 const TILE = 512
+/** Extra fog drawn beyond each side of the view, as a share of its size, so zooming out
+ * (which shrinks the last drawing until the redraw) never shows a bare edge. */
+const PAD = 0.75
+/** A story clearing opens out from its centre over this long. */
+const OPEN_MS = 1400
 
 export class FogLayer extends L.Layer {
   private canvas: HTMLCanvasElement | null = null
   private points: [number, number][] = []
   private clearings: FogClearing[] = []
+  /** When each clearing (keyed by lat,lng) first appeared, for the opening animation. */
+  private readonly opened = new Map<string, number>()
+  private frame = 0
   private pattern: CanvasPattern | null = null
   private drawnBounds: L.LatLngBounds | null = null
   private readonly fog: FogOptions
@@ -33,6 +41,12 @@ export class FogLayer extends L.Layer {
   setPoints(points: [number, number][], clearings: FogClearing[]) {
     this.points = points
     this.clearings = clearings
+    // Clearings there from the start (saved ones) are already open; new ones animate.
+    const now = this.opened.size || this.points.length ? performance.now() : -OPEN_MS
+    for (const [lat, lng] of clearings) {
+      const key = `${lat},${lng}`
+      if (!this.opened.has(key)) this.opened.set(key, now)
+    }
     this.draw()
     return this
   }
@@ -52,6 +66,7 @@ export class FogLayer extends L.Layer {
   onRemove(map: L.Map) {
     map.off('move zoom zoomend resize viewreset', this.draw, this)
     map.off('zoomanim', this.onZoomAnim, this)
+    cancelAnimationFrame(this.frame)
     this.canvas?.remove()
     this.canvas = null
     return this
@@ -73,19 +88,23 @@ export class FogLayer extends L.Layer {
     const canvas = this.canvas
     if (!map || !canvas) return
     const size = map.getSize()
-    const dpr = window.devicePixelRatio || 1
-    const topLeft = map.containerPointToLayerPoint([0, 0])
+    const pad = L.point(Math.round(size.x * PAD), Math.round(size.y * PAD))
+    const full = size.add(pad.multiplyBy(2))
+    // The fog is soft, so one canvas pixel per CSS pixel is plenty (and keeps it light).
+    const topLeft = map.containerPointToLayerPoint(pad.multiplyBy(-1))
     L.DomUtil.setPosition(canvas, topLeft)
-    this.drawnBounds = map.getBounds()
-    canvas.style.width = `${size.x}px`
-    canvas.style.height = `${size.y}px`
-    canvas.width = Math.round(size.x * dpr)
-    canvas.height = Math.round(size.y * dpr)
+    this.drawnBounds = L.latLngBounds(
+      map.containerPointToLatLng(pad.multiplyBy(-1)),
+      map.containerPointToLatLng(size.add(pad)),
+    )
+    canvas.style.width = `${full.x}px`
+    canvas.style.height = `${full.y}px`
+    canvas.width = full.x
+    canvas.height = full.y
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    ctx.scale(dpr, dpr)
 
-    // Clouds, anchored to the map: offset by the view's absolute pixel position.
+    // Clouds, anchored to the map: offset by the canvas's absolute pixel position.
     this.pattern ??= ctx.createPattern(cloudTile(this.fog.rgb), 'repeat')
     const origin = topLeft.add(map.getPixelOrigin())
     if (this.pattern) {
@@ -94,20 +113,32 @@ export class FogLayer extends L.Layer {
     } else {
       ctx.fillStyle = `rgba(${this.fog.rgb.join(',')},0.9)`
     }
-    ctx.fillRect(0, 0, size.x, size.y)
+    ctx.fillRect(0, 0, full.x, full.y)
 
+    // From here on, draw in the map's container coordinates.
+    ctx.translate(pad.x, pad.y)
+    const area = L.bounds(pad.multiplyBy(-1), size.add(pad))
     ctx.globalCompositeOperation = 'destination-out'
     const r = this.metresToPx(map, this.fog.radiusM)
-    for (const [lat, lng] of this.points) this.clear(ctx, map.latLngToContainerPoint([lat, lng]), r, 0.45, size)
-    // Inside a story you've entered: clear right to its edge, with only a thin soft rim.
+    for (const [lat, lng] of this.points) this.clear(ctx, map.latLngToContainerPoint([lat, lng]), r, 0.45, area)
+    // Inside a story you've entered: clear right to its edge, with only a thin soft rim. A new
+    // clearing opens out from the centre, easing to a stop.
+    const now = performance.now()
+    let opening = false
     for (const [lat, lng, radiusM] of this.clearings) {
-      this.clear(ctx, map.latLngToContainerPoint([lat, lng]), this.metresToPx(map, radiusM), 0.9, size)
+      const t = Math.min(1, (now - (this.opened.get(`${lat},${lng}`) ?? 0)) / OPEN_MS)
+      if (t < 1) opening = true
+      const eased = 1 - (1 - t) ** 3
+      this.clear(ctx, map.latLngToContainerPoint([lat, lng]), this.metresToPx(map, radiusM) * eased, 0.9 - 0.5 * (1 - t), area)
     }
     ctx.globalCompositeOperation = 'source-over'
+    cancelAnimationFrame(this.frame)
+    if (opening) this.frame = requestAnimationFrame(() => this.draw())
   }
 
-  private clear(ctx: CanvasRenderingContext2D, p: L.Point, r: number, solid: number, size: L.Point) {
-    if (r <= 0 || p.x < -r || p.y < -r || p.x > size.x + r || p.y > size.y + r) return
+  private clear(ctx: CanvasRenderingContext2D, p: L.Point, r: number, solid: number, area: L.Bounds) {
+    const { min, max } = area
+    if (r <= 0 || !min || !max || p.x < min.x - r || p.y < min.y - r || p.x > max.x + r || p.y > max.y + r) return
     const g = ctx.createRadialGradient(p.x, p.y, r * solid, p.x, p.y, r)
     g.addColorStop(0, 'rgba(0,0,0,1)')
     g.addColorStop(1, 'rgba(0,0,0,0)')

@@ -8,6 +8,7 @@ import { distanceToStory } from '../trigger/trigger'
 // accurate fix marks a grid cell (~200 m) as visited; the cells' centres are the clear spots.
 // On the real app they're saved on this phone and never leave it. On /showcase they last
 // for the page only, so every visitor starts fogged. Turn it off with ?fog=0 to compare.
+// For now only /showcase uses it (2026-10-16); the saving code is kept for the real app.
 // Entering a story's circle clears the whole circle, and it stays clear.
 
 export const FOG_ENABLED = new URLSearchParams(window.location.search).get('fog') !== '0'
