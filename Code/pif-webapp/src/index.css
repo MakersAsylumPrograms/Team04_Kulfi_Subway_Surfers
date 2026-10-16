@@ -140,3 +140,8 @@ body {
     animation: none;
   }
 }
+
+/* Your position on the visitor map: the mascot, lifted off the map a little. */
+.pif-me-icon {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}

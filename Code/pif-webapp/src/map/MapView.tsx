@@ -41,14 +41,17 @@ interface Props {
   palette?: MapPalette
   /** Space at the bottom (px) kept clear of the follow position, e.g. under a bottom sheet. */
   bottomInset?: number
+  /** A picture for your position (the product's mascot) instead of the plain dot. */
+  meIcon?: string
   children?: ReactNode
 }
 
-export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, children }: Props) {
+export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, meIcon, children }: Props) {
   const paletteRef = useRef(palette)
   useEffect(() => {
     paletteRef.current = palette
   }, [palette])
+  const meIconRef = useRef(meIcon)
   const zoom = close ? CLOSE_ZOOM : ZOOM
   const zoomRef = useRef(zoom)
   const elRef = useRef<HTMLDivElement>(null)
@@ -56,7 +59,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
   const layersRef = useRef<{
     path: L.Polyline
     accuracy: L.Circle
-    me: L.CircleMarker
+    me: L.CircleMarker | L.Marker
     stories: L.LayerGroup
   } | null>(null)
   const [following, setFollowing] = useState(true)
@@ -77,13 +80,20 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       path: L.polyline([], { color: paletteRef.current.path, weight: 4, opacity: 0.55 }).addTo(map),
       stories: L.layerGroup().addTo(map),
       accuracy: L.circle([0, 0], { radius: 0, stroke: false, fillColor: paletteRef.current.me, fillOpacity: 0.14 }),
-      me: L.circleMarker([0, 0], {
-        radius: 8,
-        color: '#ffffff',
-        weight: 3,
-        fillColor: paletteRef.current.me,
-        fillOpacity: 1,
-      }),
+      me: meIconRef.current
+        ? L.marker([0, 0], {
+            icon: L.icon({ iconUrl: meIconRef.current, iconSize: [46, 44], iconAnchor: [23, 22], className: 'pif-me-icon' }),
+            interactive: false,
+            keyboard: false,
+            zIndexOffset: 1000,
+          })
+        : L.circleMarker([0, 0], {
+            radius: 8,
+            color: '#ffffff',
+            weight: 3,
+            fillColor: paletteRef.current.me,
+            fillOpacity: 1,
+          }),
     }
     // Panning by hand stops the map following you until you tap Recenter.
     map.on('dragstart', () => {
@@ -118,7 +128,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     if (!layers) return
     layers.path.setStyle({ color: palette.path })
     layers.accuracy.setStyle({ fillColor: palette.me })
-    layers.me.setStyle({ fillColor: palette.me })
+    if (layers.me instanceof L.CircleMarker) layers.me.setStyle({ fillColor: palette.me })
   }, [palette])
 
   useEffect(() => {

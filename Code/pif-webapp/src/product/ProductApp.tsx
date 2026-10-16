@@ -10,6 +10,8 @@ import { routes } from '../position/routes'
 import { haversineM } from '../trigger/trigger'
 import type { Fix } from '../position/types'
 import { Intro } from './Intro'
+import { JamWordmark } from './JamWordmark'
+import mascot from './assets/jam-mascot.png'
 import { useIntro } from './useIntro'
 import { useTheme } from './useTheme'
 
@@ -118,6 +120,7 @@ export function ProductApp() {
           close={stories.some((s) => s.radius_m <= 50)}
           palette={theme.dark ? DARK : LIGHT}
           bottomInset={SHEET_PX}
+          meIcon={mascot}
         />
       </div>
 
@@ -134,7 +137,7 @@ export function ProductApp() {
               </p>
             </>
           ) : (
-            <p className="font-display text-xl leading-tight font-bold">Jam</p>
+            <JamWordmark className="h-7 w-auto" />
           )}
         </div>
         <div className="pointer-events-auto flex flex-col items-end gap-2">
