@@ -212,6 +212,12 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
     if (offerRef.current) enqueue(offerRef.current)
     setOfferNow(null)
   }, [enqueue, setOfferNow])
+  const listenRef = useRef(listen)
+  const laterRef = useRef(later)
+  useEffect(() => {
+    listenRef.current = listen
+    laterRef.current = later
+  }, [listen, later])
   const unqueue = useCallback(
     (id: string) => setQueue(queueRef.current.filter((q) => q.id !== id)),
     [setQueue],
@@ -289,9 +295,10 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
   useEffect(() => {
     const out = petOutputRef.current
     if (!out || status !== 'listening') return
-    if (here) out.showIdle(here.inside ? here.name : `near ${here.name}`, here.inside ? 'You are here' : 'Keep walking')
+    if (offer) out.showOffer(offer)
+    else if (here) out.showIdle(here.inside ? here.name : `near ${here.name}`, here.inside ? 'You are here' : 'Keep walking')
     else out.showIdle('Listening for places', '')
-  }, [here, status, pet])
+  }, [here, status, pet, offer])
 
   // Connect a pet: stories go to it from the next one on. A pat pauses or resumes,
   // a double-pat skips.
@@ -306,14 +313,22 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
         if (event === InputEvent.doublePat) testStopRef.current()
         return
       }
+      // A story on offer (ask-first mode): a pat listens, a double-pat is Later.
+      const offered = offerRef.current
+      if (!nowPlayingRef.current && offered) {
+        if (event === InputEvent.pat) listenRef.current(offered)
+        if (event === InputEvent.doublePat) laterRef.current()
+        return
+      }
       if (event === InputEvent.pat) togglePauseRef.current()
       if (event === InputEvent.doublePat) finishRef.current()
     }
+    out.announceArrival = !askFirst
     petOutputRef.current = out
     return () => {
       if (petOutputRef.current === out) petOutputRef.current = null
     }
-  }, [pet, player])
+  }, [pet, player, askFirst])
 
   const start = useCallback(
     (s: JourneySettings) => {

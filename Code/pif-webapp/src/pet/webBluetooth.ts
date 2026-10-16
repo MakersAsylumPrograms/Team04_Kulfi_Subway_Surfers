@@ -114,6 +114,13 @@ export async function pairWebBluetoothPet(): Promise<PetLink> {
     disconnectHandlers.forEach((h) => h())
   })
 
+  // Leaving the page (closing the tab, reloading) drops the link at once, so the pet shows it's
+  // alone straight away instead of waiting for the link to time out.
+  window.addEventListener('pagehide', () => {
+    closing = true
+    if (device.gatt?.connected) device.gatt.disconnect()
+  })
+
   return {
     name: device.name || 'Pet',
     fake: false,

@@ -36,6 +36,12 @@ export class PetOutput implements StoryOutput {
   private confirmed = false
   /** Set by the journey: what a pat or double-pat on the pet should do. */
   onInput: ((event: InputEventValue) => void) | null = null
+  /**
+   * Say "You've arrived at …" on the pet for a moment before each story. Off in the visitor
+   * app, where the pop-up (and the pet's own "Story here") already announced it and you
+   * chose to listen, or are replaying.
+   */
+  announceArrival = true
 
   constructor(link: PetLink, phone: StoryOutput) {
     this.link = link
@@ -68,10 +74,12 @@ export class PetOutput implements StoryOutput {
     const send = async () => {
       // Arrival first: the pet announces the new place for a moment before the story,
       // so the audio doesn't start out of nowhere.
-      await this.link.write('nowShowing', encodeNowShowing(story.icon_id, `You've arrived at ${story.place}`, 'A story starts in a moment'))
-      await this.link.write('haptic', encodeHaptic(Haptic.short))
-      await new Promise((r) => setTimeout(r, ARRIVAL_MS))
-      if (this.story !== story || this.mode !== 'pet') return // skipped or stopped meanwhile
+      if (this.announceArrival) {
+        await this.link.write('nowShowing', encodeNowShowing(story.icon_id, `You've arrived at ${story.place}`, 'A story starts in a moment'))
+        await this.link.write('haptic', encodeHaptic(Haptic.short))
+        await new Promise((r) => setTimeout(r, ARRIVAL_MS))
+        if (this.story !== story || this.mode !== 'pet') return // skipped or stopped meanwhile
+      }
       await this.link.write('nowShowing', encodeNowShowing(story.icon_id, story.place, story.title))
       await this.link.write('play', encodePlay(story.id))
     }
@@ -117,6 +125,21 @@ export class PetOutput implements StoryOutput {
     if (text === this.lastIdleText) return
     this.lastIdleText = text
     void this.link.write('nowShowing', encodeNowShowing(0, place, line)).catch(() => {})
+  }
+
+  /**
+   * A story is on offer (the app's pop-up): the pet reacts (heart eyes) and says so, and a
+   * pat on it means Listen. Only between stories; a playing story keeps its own screen.
+   */
+  showOffer(story: Story) {
+    if (this.mode !== 'idle' || !this.connected) return
+    const text = `offer|${story.id}`
+    if (text === this.lastIdleText) return
+    this.lastIdleText = text
+    void this.link
+      .write('nowShowing', encodeNowShowing(story.icon_id, story.place, 'Story here. Pat me to listen'))
+      .then(() => this.link.write('haptic', encodeHaptic(Haptic.short)))
+      .catch(() => {})
   }
 
   position(): PlaybackPosition {

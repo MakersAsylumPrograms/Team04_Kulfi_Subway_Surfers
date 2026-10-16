@@ -119,8 +119,8 @@ void screenDraw(const ScreenModel& m, uint8_t) {
 
 void screenSleep(bool sleep) { oled.setPowerSave(sleep ? 1 : 0); }
 void screenRedrawAll() {}
-void screenFadeIn() {}
-void screenSplash(const char*, uint32_t) {}
+void screenStartup() {}
+void screenStartupFadeOut() {}
 void screenSetInvert(bool) {}
 bool screenLabFrame() {  // the lab needs the colour TFT
   Serial.println("LABERR the lab needs the TFT build");
@@ -205,7 +205,7 @@ void screenBegin() {
   tft.invertDisplay(prefs.getBool("invert", false));
   prefs.end();
   tft.setRotation(PET_ROTATION);
-  tft.fillScreen(0x0000);  // black while it starts; screenFadeIn() brings up the white
+  tft.fillScreen(0x0000);  // black while it starts; screenStartup() fades the picture in
 }
 
 void screenSetInvert(bool on) {
@@ -216,30 +216,43 @@ void screenSetInvert(bool on) {
   tft.invertDisplay(on);
 }
 
-// After the startup video: a dark screen, then the name, bold and white, centred on the upright
-// screen, held for ms. The fade to white follows.
-void screenSplash(const char* name, uint32_t ms) {
-  tft.setRotation(PET_ROTATION);
-  tft.fillScreen(0x0000);
-  delay(200);  // a beat of dark screen
-  tft.setFont(&FreeSansBold24pt7b);
-  tft.setTextColor(0xFFFF);
-  int16_t x1, y1;
-  uint16_t w, h;
-  tft.getTextBounds(name, 0, 0, &x1, &y1, &w, &h);
-  tft.setCursor((tft.width() - w) / 2 - x1, (tft.height() - h) / 2 - y1);
-  tft.print(name);
-  tft.setFont(nullptr);
-  delay(ms);
+// Startup: the mascot over "JAM" on teal (startup_image.h, made by scripts/convert-startup.mjs),
+// faded up from black; later it fades to the white of the pet's screen. The backlight is wired
+// straight to 3.3 V, so the picture fades rather than the light: each step mixes every pixel
+// toward black or white and repaints the whole screen (~60 ms at 20 MHz), so few steps, no pauses.
+#include "startup_image.h"
+
+// k: how much of the picture (0..256), the rest black or white.
+static void drawStartupMix(uint16_t k, bool towardWhite) {
+  static uint16_t row[STARTUP_W];
+  const int tr = towardWhite ? 31 : 0, tg = towardWhite ? 63 : 0, tb = towardWhite ? 31 : 0;
+  tft.startWrite();
+  tft.setAddrWindow(0, 0, STARTUP_W, STARTUP_H);
+  for (int y = 0; y < STARTUP_H; y++) {
+    for (int x = 0; x < STARTUP_W; x++) {
+      uint16_t c = pgm_read_word(&STARTUP_IMAGE[y * STARTUP_W + x]);
+      if (k < 256) {
+        int r = tr + (((int)(c >> 11) - tr) * k >> 8);
+        int g = tg + (((int)((c >> 5) & 63) - tg) * k >> 8);
+        int b = tb + (((int)(c & 31) - tb) * k >> 8);
+        c = (r << 11) | (g << 5) | b;
+      }
+      row[x] = c;
+    }
+    tft.writePixels(row, STARTUP_W);
+  }
+  tft.endWrite();
 }
 
-// After startup: from black, fade up to the white background (the backlight is wired straight
-// to 3.3 V, so the picture fades rather than the light).
-void screenFadeIn() {
-  // Few steps, no pauses: each step repaints the whole screen (~60 ms at 20 MHz), so more steps
-  // look like slow wipes rather than a fade.
-  const uint8_t levels[] = { 40, 90, 150, 205, 240, 255 };
-  for (uint8_t v : levels) tft.fillScreen(((v & 0xF8) << 8) | ((v & 0xFC) << 3) | (v >> 3));
+void screenStartup() {
+  tft.setRotation(PET_ROTATION);
+  const uint16_t steps[] = { 70, 140, 205, 256 };
+  for (uint16_t k : steps) drawStartupMix(k, false);
+}
+
+void screenStartupFadeOut() {
+  const uint16_t steps[] = { 200, 140, 85, 40, 0 };
+  for (uint16_t k : steps) drawStartupMix(k, true);
 }
 
 // Two screens, upright 240x320, on white:

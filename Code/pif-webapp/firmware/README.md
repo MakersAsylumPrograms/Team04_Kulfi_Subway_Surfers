@@ -124,8 +124,18 @@ app. Missing file → the app plays it on the phone.
   `fit=` and `rotation=` in the `.cfg` make them the default.
   Text above and below the picture: `top=…` / `bottom=…` in the `.cfg` ("|" starts a new line), or
   `media top <text>` / `media bottom <text>` to try it. Drawn once, so it costs nothing per frame.
-- **Startup sound:** put a WAV (16-bit PCM) at `/sounds/startup.wav` on the card and the pet plays it
-  at power-on and on every wake from sleep. No file, no sound.
+- **Startup (2026-10-16):** the mascot over "JAM" on teal fades in from black, stays 1.8 s
+  (`STARTUP_HOLD_MS`), then fades to the white pet screen. The picture is in flash
+  (`startup_image.h`), made by `node scripts/convert-startup.mjs [picture]` from
+  `assets/pet-startup/startup.png` (needs ffmpeg). The startup video is gone.
+- **Startup sound:** put a WAV (16-bit PCM) at `/sounds/startup.wav` on the card (or keep the old
+  video's `/media/startup.wav`) and the pet plays it with the picture, at power-on and on every wake
+  from sleep. No file, no sound.
+- **Phone gone (2026-10-16):** the pet asks for a 4 s link timeout on connect and re-checks the link
+  every second, so the dot goes grey and the screen goes back to waiting within about 4 s of the phone
+  leaving (at once if the app is closed). It keeps playing a story it already started.
+- **Story offers (2026-10-16):** when the visitor app pops up a story, the pet shows the place with
+  "Story here. Pat me to listen" and makes heart eyes. A tap on KEY3 is Listen, a double-tap is Later.
 
 **Serial is 921600 baud** (since 2026-10-06, for the pet screen lab): set the Serial Monitor to 921600.
 The lab at `/lab` can draw on the pet's screen over USB ("Lab mode" in `pet_screen.h`) and send it

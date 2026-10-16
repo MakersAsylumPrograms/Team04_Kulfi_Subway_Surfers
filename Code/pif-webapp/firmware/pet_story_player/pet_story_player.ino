@@ -61,6 +61,7 @@ enum TransportCmd : uint8_t { CMD_RESUME = 0, CMD_PAUSE = 1, CMD_STOP = 2, CMD_V
 enum InputEvent : uint8_t { INPUT_PAT = 1, INPUT_DOUBLE_PAT = 2 };
 
 #define PET_NAME "Jam Pet"
+#define STARTUP_HOLD_MS 1800  // how long the startup picture stays before fading
 
 NimBLECharacteristic* playbackChr = nullptr;
 NimBLECharacteristic* inputChr = nullptr;
@@ -353,19 +354,52 @@ void requestPlay(const String& id) {
   xSemaphoreGive(requestLock);
 }
 
+// Losing the phone: a clean disconnect (the app closing, Pair pet tapped again) arrives at
+// once. A phone that just goes away (out of range, Bluetooth switched off, battery dead) only
+// shows up when the link's supervision timeout runs out, which the phone sets and can be 20 s
+// or more; so on connect the pet asks for 4 s. loop() also re-checks the real connection count
+// every second (checkConnection), in case a callback was missed.
+#define LINK_TIMEOUT_10MS 400  // 4 s
+void phoneGone() {
+  connected = false;
+  statusDirty = true;
+  // What the phone last sent is out of date now: show the plain waiting screen instead.
+  shownPlace = "";
+  shownTitle = "";
+  textDirty = true;
+  react(MOOD_SAD, 3000);
+}
+
 class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer*, NimBLEConnInfo&) override {
+  void onConnect(NimBLEServer* server, NimBLEConnInfo& info) override {
     connected = true;
     statusDirty = true;
     poke();
+    // 30-60 ms between packets, no skipping, gone after 4 s of silence.
+    server->updateConnParams(info.getConnHandle(), 24, 48, 0, LINK_TIMEOUT_10MS);
   }
-  void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int) override {
-    connected = false;
-    statusDirty = true;
-    react(MOOD_SAD, 3000);
+  void onDisconnect(NimBLEServer* server, NimBLEConnInfo&, int reason) override {
+    Serial.printf("Phone disconnected (reason 0x%x)\n", reason);
+    if (server->getConnectedCount() == 0) phoneGone();
     NimBLEDevice::startAdvertising();
   }
 };
+
+void checkConnection(uint32_t now) {
+  static uint32_t checkedAt = 0;
+  if (now - checkedAt < 1000) return;
+  checkedAt = now;
+  bool linked = NimBLEDevice::getServer()->getConnectedCount() > 0;
+  if (linked && !connected) {
+    connected = true;
+    statusDirty = true;
+  } else if (!linked && connected) {
+    Serial.println("Phone gone (no link left)");
+    phoneGone();
+  }
+  // Always findable while no phone is connected.
+  if (!linked && !NimBLEDevice::getAdvertising()->isAdvertising()) NimBLEDevice::startAdvertising();
+}
 
 class PlayCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* chr, NimBLEConnInfo&) override {
@@ -466,13 +500,13 @@ void setup() {
   // 4. Audio on its own task, above loop()'s priority, so screen drawing can't starve it.
   xTaskCreatePinnedToCore(audioTask, "audio", 8192, nullptr, 3, nullptr, 1);
 
-  // 5. Startup: the startup video with its sound (/media/startup.mjpeg + .wav), or if the card
-  //    has no video, just the startup sound (/sounds/startup.wav).
-  if (!mediaStartup()) mediaPlaySound("/sounds/startup.wav");
-
-  // 6. Then a dark screen, the name (under a second), and the white fades in to the pet's screen.
-  screenSplash("JAM", 700);
-  screenFadeIn();
+  // 5. Startup: the mascot and "JAM" fade in with the startup sound (/sounds/startup.wav, or
+  //    the old startup video's /media/startup.wav), stay a moment, then fade to the white of
+  //    the pet's screen.
+  screenStartup();
+  mediaPlaySound(SD.exists("/sounds/startup.wav") ? "/sounds/startup.wav" : "/media/startup.wav");
+  delay(STARTUP_HOLD_MS);
+  screenStartupFadeOut();
   screenRedrawAll();
 
   Serial.println("Ready. Type help for the commands.");
@@ -881,6 +915,7 @@ void loop() {
   }
 
   readKeys(millis());
+  checkConnection(millis());
 
   static bool mediaShown = false;
   if (media.playing) {

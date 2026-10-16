@@ -139,25 +139,6 @@ static bool mediaOpenWav(const String& path) {
 bool mediaPlay(const String& name);  // below
 void mediaTick();
 
-// The startup video: /media/startup.mjpeg (+ startup.wav, startup.cfg) plays once at power-on,
-// before anything else. Returns when it's over (10 s at most); false if there isn't one.
-bool mediaStartup() {
-#if PET_SCREEN_OLED
-  return false;
-#else
-  if (!SD.exists(String(MEDIA_DIR) + "/startup.mjpeg")) return false;
-  if (!mediaPlay("startup")) return false;
-  media.loop = false;
-  uint32_t t0 = millis();
-  while (media.playing && millis() - t0 < 10000) {
-    mediaTick();
-    delay(1);
-  }
-  mediaFree();
-  return true;
-#endif
-}
-
 // Plays a WAV on its own, with no picture (the startup sound). Quietly does nothing if the
 // file isn't on the card. Uses the same path as a video's sound.
 void mediaPlaySound(const String& path) {
