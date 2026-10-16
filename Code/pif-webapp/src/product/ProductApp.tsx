@@ -260,7 +260,7 @@ export function ProductApp() {
         </section>
       </div>
 
-      {intro.open && <Intro onClose={intro.close} />}
+      {intro.open && <Intro onClose={intro.close} splash={intro.firstVisit} />}
     </div>
   )
 }
