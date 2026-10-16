@@ -6,7 +6,7 @@ import { useJourney } from '../journey/useJourney'
 import { MapView, type MapPalette } from '../map/MapView'
 import { hasWebBluetooth } from '../pet/link'
 import { usePet } from '../pet/usePet'
-import { routes } from '../position/routes'
+import { routes, showcaseRoute } from '../position/routes'
 import { haversineM } from '../trigger/trigger'
 import type { Fix } from '../position/types'
 import { Intro } from './Intro'
@@ -19,6 +19,8 @@ import { useTheme } from './useTheme'
 // the bottom. There is no "journey" to start: Jam listens for places as soon as location is
 // allowed, offers each story with a pop-up (Listen / Later), and keeps the rest in a queue.
 // Same engine as /debug, but real GPS only, the positions in stories.json, no test tools.
+// /showcase is the same app riding a simulated route (Dadar, Worli, the Nehru Centre), for
+// demonstrating in a room where no train exists.
 
 const stories = bundledStories
 const allIds = new Set(stories.map((s) => s.id))
@@ -30,6 +32,9 @@ const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', unheard: '#8a90
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const OFFER_TIMEOUT_MS = 45_000 // an unanswered pop-up slips into the queue
 const GPS_START = { source: 'gps', route: routes[0], speed: 1.4, noise: false } as const
+// About 5.5 km at 25 m/s: a ride of under four minutes, so a visitor hears it through.
+const RIDE_START = { source: 'simulate', route: showcaseRoute, speed: 25, noise: false } as const
+const RIDE_FROM: [number, number] = [showcaseRoute.points[0].lat, showcaseRoute.points[0].lng]
 const distance = (m: number) => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`)
 
 // Before a journey: if this browser already allows location, open the map on where you are
@@ -58,7 +63,7 @@ function usePreviewFix(): Fix | null {
   return fix
 }
 
-export function ProductApp() {
+export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   // Light only for now (2026-10-15). Drop lightOnly and restore the theme button below to bring dark back.
   const theme = useTheme({ lightOnly: true })
   const pet = usePet(stories)
@@ -84,13 +89,13 @@ export function ProductApp() {
     navigator.permissions
       ?.query({ name: 'geolocation' as PermissionName })
       .then((p) => {
-        if (!cancelled && p.state === 'granted') startRef.current({ ...GPS_START })
+        if (!cancelled && !showcase && p.state === 'granted') startRef.current({ ...GPS_START })
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [showcase])
 
   // An offer nobody answers goes to the queue after a while.
   const laterRef = useRef(journey.later)
@@ -110,13 +115,13 @@ export function ProductApp() {
       <div className="absolute inset-0">
         <MapView
           fill
-          fix={journey.fix ?? previewFix}
+          fix={journey.fix ?? (showcase ? null : previewFix)}
           path={journey.path}
           stories={stories}
           revealed={allIds}
           heardIds={heardIds}
           playingId={np?.story.id ?? null}
-          fallbackCenter={[stories[0].lat, stories[0].lng]}
+          fallbackCenter={showcase ? RIDE_FROM : [stories[0].lat, stories[0].lng]}
           close={stories.some((s) => s.radius_m <= 50)}
           palette={theme.dark ? DARK : LIGHT}
           bottomInset={SHEET_PX}
@@ -190,7 +195,23 @@ export function ProductApp() {
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--line)]" />
 
-          {!active && (
+          {!active && showcase && (
+            <>
+              <p className="text-base leading-snug text-[var(--muted)]">
+                Take a ride from Dadar through Worli to the Nehru Centre. As you pass each place, its story pops up.
+              </p>
+              <button
+                type="button"
+                onClick={() => journey.start({ ...RIDE_START })}
+                className="font-display mt-4 w-full rounded-2xl bg-[var(--accent)] py-4 text-lg font-bold text-[var(--on-accent)] active:scale-[0.99]"
+              >
+                Start the ride
+              </button>
+              <p className="mt-3 text-center text-sm text-[var(--muted)]">A demo ride. Earphones in for the stories.</p>
+            </>
+          )}
+
+          {!active && !showcase && (
             <>
               <p className="text-base leading-snug text-[var(--muted)]">
                 Stories play when you're near the places they're about. Jam needs your location to know where you are.
@@ -214,9 +235,15 @@ export function ProductApp() {
                 <span className="relative inline-flex h-3 w-3 rounded-full bg-[var(--accent)]" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-display text-lg font-bold">Listening for stories</p>
+                <p className="font-display text-lg font-bold">
+                  {!showcase ? 'Listening for stories' : journey.routeEnded ? 'Ride finished' : 'Riding'}
+                </p>
                 <p className="mt-0.5 text-sm text-[var(--muted)]">
-                  {journey.error
+                  {showcase && !journey.routeEnded && journey.progress?.nextPoint
+                    ? `Next: ${journey.progress.nextPoint}`
+                    : showcase && journey.routeEnded
+                      ? 'You reached the Nehru Centre.'
+                      : journey.error
                     ? journey.error
                     : journey.next
                       ? `Nearest: ${journey.next.story.place}, ${distance(journey.next.distance)} away`
@@ -225,13 +252,23 @@ export function ProductApp() {
                         : 'Finding you…'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={journey.stop}
-                className="shrink-0 rounded-full bg-[var(--surface-2)] px-4 py-2 text-sm font-semibold ring-1 ring-[var(--line)] active:scale-95"
-              >
-                Stop
-              </button>
+              {showcase && journey.routeEnded ? (
+                <button
+                  type="button"
+                  onClick={() => journey.start({ ...RIDE_START })}
+                  className="shrink-0 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--on-accent)] active:scale-95"
+                >
+                  Ride again
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={journey.stop}
+                  className="shrink-0 rounded-full bg-[var(--surface-2)] px-4 py-2 text-sm font-semibold ring-1 ring-[var(--line)] active:scale-95"
+                >
+                  Stop
+                </button>
+              )}
             </div>
           )}
 
@@ -282,7 +319,9 @@ function Offer(props: { story: Story; distance: number | null; onListen: () => v
     >
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-bold tracking-widest text-[var(--accent)] uppercase">
-          {props.distance !== null && props.distance > 30 ? `Story · ${distance(props.distance)}` : 'Story here'}
+          {props.distance !== null && props.distance > props.story.radius_m
+            ? `Story · ${distance(props.distance - props.story.radius_m)} back`
+            : 'Story here'}
         </p>
         <p className="font-display truncate text-lg leading-tight font-bold">{props.story.place}</p>
         <p className="truncate text-sm text-[var(--muted)]">{props.story.title}</p>

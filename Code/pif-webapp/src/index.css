@@ -145,3 +145,25 @@ body {
 .pif-me-icon {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
 }
+
+/* A story circle you're standing in breathes: its fill and outline swell and settle. */
+@keyframes pif-breathe {
+  0%,
+  100% {
+    fill-opacity: 0.1;
+    stroke-width: 1.5px;
+  }
+  50% {
+    fill-opacity: 0.3;
+    stroke-width: 5px;
+  }
+}
+.pif-story-inside {
+  animation: pif-breathe 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pif-story-inside {
+    animation: none;
+    fill-opacity: 0.25;
+  }
+}

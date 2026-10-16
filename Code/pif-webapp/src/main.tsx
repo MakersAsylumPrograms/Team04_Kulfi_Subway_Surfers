@@ -8,12 +8,13 @@ import { LazyMediaDashboard } from './lab/LazyMediaDashboard.tsx'
 
 // Faces of one app, no router library: /debug is the testing tool (simulation, showcase
 // marking, pet test panel), /lab is the pet screen lab (try pictures and videos on the
-// pet's display), /media is the pet media dashboard (videos on its SD card), and everything
-// else is what visitors see.
+// pet's display), /media is the pet media dashboard (videos on its SD card), /showcase is the
+// visitor app on a simulated ride (for demos), and everything else is what visitors see.
 const path = window.location.pathname.replace(/\/+$/, '')
 const isDebug = path.endsWith('/debug')
 const isLab = path.endsWith('/lab')
 const isMedia = path.endsWith('/media')
+const isShowcase = path.endsWith('/showcase')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -28,7 +29,7 @@ createRoot(document.getElementById('root')!).render(
     ) : isDebug ? (
       <App />
     ) : (
-      <ProductApp />
+      <ProductApp showcase={isShowcase} />
     )}
   </StrictMode>,
 )

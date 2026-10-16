@@ -1,8 +1,9 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Story } from '../data/types'
 import type { Fix } from '../position/types'
+import { distanceToStory } from '../trigger/trigger'
 
 // Plain Leaflet driven from effects: one map instance, layers updated in place.
 
@@ -135,7 +136,15 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     layersRef.current?.path.setLatLngs(path)
   }, [path])
 
+  // Stories whose circle you're standing in breathe gently. Keyed as a string so the circles
+  // are only redrawn when you cross a boundary, not on every fix (that would restart the animation).
+  const insideKey = useMemo(
+    () => (fix ? stories.filter((st) => distanceToStory(fix, st) <= st.radius_m).map((st) => st.id).join('|') : ''),
+    [fix, stories],
+  )
+
   useEffect(() => {
+    const inside = new Set(insideKey.split('|'))
     const group = layersRef.current?.stories
     if (!group) return
     group.clearLayers()
@@ -151,11 +160,12 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
         dashArray: heard || playing ? undefined : '4 4',
         fillColor: color,
         fillOpacity: playing ? 0.2 : heard ? 0.12 : 0.05,
+        className: inside.has(story.id) ? 'pif-story-inside' : undefined,
       })
         .bindTooltip(story.title, { permanent: true, direction: 'center', className: 'pif-story-label' })
         .addTo(group)
     }
-  }, [stories, revealed, heardIds, playingId, palette])
+  }, [stories, revealed, heardIds, playingId, palette, insideKey])
 
   const recenter = () => {
     followingRef.current = true
