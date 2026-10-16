@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Story } from '../data/types'
 import type { Fix } from '../position/types'
 import { distanceToStory } from '../trigger/trigger'
+import { FogLayer, type FogOptions } from './fog'
 
 // Plain Leaflet driven from effects: one map instance, layers updated in place.
 
@@ -47,15 +48,21 @@ interface Props {
   bottomInset?: number
   /** A picture for your position (the product's mascot) instead of the plain dot. */
   meIcon?: string
+  /** Fog over everything except around these points (an experiment on the visitor map). */
+  fog?: FogOptions & { points: [number, number][] }
+  /** Unheard stories show only their place name, with a lock, until you've heard them. */
+  lockedLabels?: boolean
   children?: ReactNode
 }
 
-export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, meIcon, children }: Props) {
+export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, meIcon, fog, lockedLabels = false, children }: Props) {
   const paletteRef = useRef(palette)
   useEffect(() => {
     paletteRef.current = palette
   }, [palette])
   const meIconRef = useRef(meIcon)
+  const fogOptionsRef = useRef(fog ? { color: fog.color, radiusM: fog.radiusM } : null)
+  const fogRef = useRef<FogLayer | null>(null)
   const zoom = close ? CLOSE_ZOOM : ZOOM
   const zoomRef = useRef(zoom)
   const elRef = useRef<HTMLDivElement>(null)
@@ -99,6 +106,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
             fillOpacity: 1,
           }),
     }
+    if (fogOptionsRef.current) fogRef.current = new FogLayer(fogOptionsRef.current).addTo(map)
     // Panning by hand stops the map following you until you tap Recenter.
     map.on('dragstart', () => {
       followingRef.current = false
@@ -109,6 +117,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       map.remove()
       mapRef.current = null
       layersRef.current = null
+      fogRef.current = null
     }
   }, [])
 
@@ -139,6 +148,11 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     layersRef.current?.path.setLatLngs(path)
   }, [path])
 
+  const fogPoints = fog?.points
+  useEffect(() => {
+    if (fogPoints) fogRef.current?.setPoints(fogPoints)
+  }, [fogPoints])
+
   // Which story circles you're standing in. Keyed as a string so the circles are only redrawn
   // when you cross a boundary, not on every fix (that would restart the arrival animation).
   const insideKey = useMemo(
@@ -161,6 +175,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       const playing = story.id === playingId
       const heard = heardIds.has(story.id)
       const here = inside.has(story.id)
+      const locked = lockedLabels && !heard && !playing
       // Standing in a story you haven't heard tints it with the "here" colour, like the wash;
       // it turns the playing colour once the story plays.
       const color = playing ? palette.playing : here && !heard ? palette.here : heard ? palette.heard : palette.unheard
@@ -183,10 +198,14 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
         fillOpacity: playing ? 0.2 : heard ? 0.12 : arrived.has(story.id) ? 0 : here ? 0.14 : 0.05,
         className: arrived.has(story.id) ? 'pif-story-arrive' : undefined,
       })
-        .bindTooltip(story.title, { permanent: true, direction: 'center', className: 'pif-story-label' })
+        .bindTooltip(locked ? story.place : story.title, {
+          permanent: true,
+          direction: 'center',
+          className: locked ? 'pif-story-label pif-story-locked' : 'pif-story-label',
+        })
         .addTo(group)
     }
-  }, [stories, revealed, heardIds, playingId, palette, insideKey])
+  }, [stories, revealed, heardIds, playingId, palette, insideKey, lockedLabels])
 
   const recenter = () => {
     followingRef.current = true

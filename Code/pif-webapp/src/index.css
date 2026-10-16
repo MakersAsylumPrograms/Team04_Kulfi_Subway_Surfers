@@ -21,6 +21,15 @@ body {
 .leaflet-tooltip.pif-story-label::before {
   display: none;
 }
+/* Locked story (fog experiment): place name only, muted, with a small padlock. */
+.leaflet-tooltip.pif-story-locked {
+  @apply font-medium text-stone-600;
+  padding-left: 1.45rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2.4' stroke-linecap='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.4rem center;
+  background-size: 0.8rem;
+}
 
 /* ---------- Product theme (the visitor version at /) ----------
    Light keeps the map's own colours; dark is deliberately minimal. One accent: the pet's

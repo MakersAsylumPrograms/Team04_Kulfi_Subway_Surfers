@@ -12,6 +12,7 @@ import type { Fix } from '../position/types'
 import { Intro } from './Intro'
 import { JamWordmark } from './JamWordmark'
 import mascot from './assets/jam-mascot.svg'
+import { FOG_ENABLED, FOG_REVEAL_M, useFog } from './useFog'
 import { useIntro } from './useIntro'
 import { useTheme } from './useTheme'
 
@@ -80,6 +81,21 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   const here = journey.here
   const [queueOpen, setQueueOpen] = useState(false)
 
+  // Fog and locked pins (experiment, ?fog=0 turns both off): only stories near where you've
+  // been are on the map, and those you haven't heard show just their place name.
+  const fogPoints = useFog(journey.fix, !showcase)
+  const revealed = useMemo(
+    () =>
+      FOG_ENABLED
+        ? new Set(
+            stories
+              .filter((st) => fogPoints.some(([lat, lng]) => haversineM(lat, lng, st.lat, st.lng) <= FOG_REVEAL_M + st.radius_m))
+              .map((st) => st.id),
+          )
+        : allIds,
+    [fogPoints],
+  )
+
   // If this browser already allows location, start listening for places straight away.
   // Otherwise the "Find stories near me" button asks (it never asks by itself).
   const startRef = useRef(journey.start)
@@ -120,7 +136,7 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           fix={journey.fix ?? (showcase ? null : previewFix)}
           path={journey.path}
           stories={stories}
-          revealed={allIds}
+          revealed={revealed}
           heardIds={heardIds}
           playingId={np?.story.id ?? null}
           fallbackCenter={showcase ? RIDE_FROM : [stories[0].lat, stories[0].lng]}
@@ -128,6 +144,12 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           palette={theme.dark ? DARK : LIGHT}
           bottomInset={SHEET_PX}
           meIcon={mascot}
+          fog={
+            FOG_ENABLED
+              ? { points: fogPoints, radiusM: FOG_REVEAL_M, color: theme.dark ? 'rgba(10, 11, 12, 0.88)' : 'rgba(236, 234, 228, 0.92)' }
+              : undefined
+          }
+          lockedLabels={FOG_ENABLED}
         />
       </div>
 
