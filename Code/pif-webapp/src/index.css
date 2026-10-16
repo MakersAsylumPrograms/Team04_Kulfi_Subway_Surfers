@@ -91,7 +91,7 @@ body {
   color: var(--intro-cta-ink);
 }
 .jam-fade {
-  transition: opacity 600ms ease;
+  transition: opacity 800ms ease;
 }
 @keyframes jam-bob {
   50% {

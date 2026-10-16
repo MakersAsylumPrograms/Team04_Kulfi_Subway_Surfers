@@ -4,18 +4,19 @@ import mascot from './assets/jam-mascot.png'
 import wordmark from './assets/jam-wordmark.svg'
 
 // The first thing a new visitor sees: a splash with the mascot and the JAM wordmark, which
-// fades into what Jam is, how to use it, and what the pet is. Shown once per device (see
+// fades by itself after a moment (or on a tap) into what Jam is, how to use it, and what the pet is. Shown once per device (see
 // useIntro); the "?" button on the map opens it again, straight on the second part.
 
-const FADE_MS = 600
+const SPLASH_MS = 2000 // how long the splash stays before fading
+const FADE_MS = 800 // keep in step with .jam-fade in index.css
 
 export function Intro(props: { onClose: () => void; splash?: boolean }) {
   const { onClose } = props
   // 'splash' -> 'fading' (both drawn, splash fading out) -> 'about'
   const [stage, setStage] = useState<'splash' | 'fading' | 'about'>(props.splash ? 'splash' : 'about')
   useEffect(() => {
-    if (stage !== 'fading') return
-    const t = setTimeout(() => setStage('about'), FADE_MS)
+    if (stage === 'about') return
+    const t = setTimeout(() => setStage(stage === 'splash' ? 'fading' : 'about'), stage === 'splash' ? SPLASH_MS : FADE_MS)
     return () => clearTimeout(t)
   }, [stage])
   useEffect(() => {
@@ -96,10 +97,11 @@ export function Intro(props: { onClose: () => void; splash?: boolean }) {
   )
 }
 
-/** Mascot, wordmark and tagline; Get Started fades it into the rest of the intro. */
+/** Mascot, wordmark and tagline. Fades into the rest of the intro by itself; a tap skips ahead. */
 function Splash(props: { fading: boolean; onStart: () => void }) {
   return (
     <div
+      onClick={props.onStart}
       className={`jam-fade fixed inset-0 z-10 flex flex-col items-center justify-center overflow-y-auto bg-[var(--intro-bg)] px-6 py-10 text-center ${props.fading ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
     >
       <img src={mascot} alt="" draggable={false} className="jam-bob w-[clamp(170px,52vw,280px)] select-none" />
@@ -115,13 +117,6 @@ function Splash(props: { fading: boolean; onStart: () => void }) {
         on the Go.
       </p>
       <p className="mt-3 text-base opacity-90 sm:text-lg">Curated ideas, stories &amp; perspectives</p>
-      <button
-        type="button"
-        onClick={props.onStart}
-        className="jam-cta mt-10 flex h-16 w-full max-w-sm shrink-0 items-center justify-center gap-4 rounded-full text-lg font-semibold active:scale-[0.99]"
-      >
-        Get Started <span aria-hidden="true">⟶</span>
-      </button>
     </div>
   )
 }
