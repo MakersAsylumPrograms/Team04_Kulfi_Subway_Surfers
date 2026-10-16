@@ -135,7 +135,7 @@ app. Missing file → the app plays it on the phone.
   every second, so the dot goes grey and the screen goes back to waiting within about 4 s of the phone
   leaving (at once if the app is closed). It keeps playing a story it already started.
 - **Story offers (2026-10-16):** when the visitor app pops up a story, the pet shows the place with
-  "Story here. Pat me to listen", makes heart eyes and chimes (`/sounds/story-here.wav`, a two-note
+  "Story here. Press play to listen", makes heart eyes and chimes (`/sounds/story-here.wav`, a two-note
   chime in `firmware/sd-card/sounds/`; no file, no chime). A tap on KEY3 is Listen, a double-tap is
   Later. With nothing on offer, a tap plays the first story waiting in the app's queue, or the pet
   shows where the nearest story is.

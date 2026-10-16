@@ -129,7 +129,7 @@ export class PetOutput implements StoryOutput {
 
   /**
    * A story is on offer (the app's pop-up): the pet reacts (heart eyes) and says so, and a
-   * pat on it means Listen. Only between stories; a playing story keeps its own screen.
+   * press of its play button (KEY3, sent as a pat) means Listen. Only between stories; a playing story keeps its own screen.
    */
   showOffer(story: Story) {
     if (this.mode !== 'idle' || !this.connected) return
@@ -137,7 +137,7 @@ export class PetOutput implements StoryOutput {
     if (text === this.lastIdleText) return
     this.lastIdleText = text
     void this.link
-      .write('nowShowing', encodeNowShowing(story.icon_id, story.place, 'Story here. Pat me to listen'))
+      .write('nowShowing', encodeNowShowing(story.icon_id, story.place, 'Story here. Press play to listen'))
       .then(() => this.link.write('haptic', encodeHaptic(Haptic.short)))
       .catch(() => {})
   }
