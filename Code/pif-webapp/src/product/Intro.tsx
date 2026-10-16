@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { hasWebBluetooth } from '../pet/link'
-import mascot from './assets/jam-mascot.png'
+import mascot from './assets/jam-mascot.svg'
 import wordmark from './assets/jam-wordmark.svg'
 
 // The first thing a new visitor sees: a splash with the mascot and the JAM wordmark, which

@@ -11,7 +11,7 @@ import { haversineM } from '../trigger/trigger'
 import type { Fix } from '../position/types'
 import { Intro } from './Intro'
 import { JamWordmark } from './JamWordmark'
-import mascot from './assets/jam-mascot.png'
+import mascot from './assets/jam-mascot.svg'
 import { useIntro } from './useIntro'
 import { useTheme } from './useTheme'
 
