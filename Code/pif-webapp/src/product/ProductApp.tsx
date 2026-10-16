@@ -26,14 +26,16 @@ const stories = bundledStories
 const allIds = new Set(stories.map((s) => s.id))
 const SHEET_PX = 170 // roughly how tall the bottom sheet is, to keep your dot visible above it
 
-const LIGHT: MapPalette = { heard: '#00796b', playing: '#00a896', unheard: '#5f6b6a', me: '#00a896', path: '#00796b' }
-const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', unheard: '#8a9091', me: '#00f0d8', path: '#00f0d8' }
+// "here" is the mascot's pink, so standing in a story's circle reads differently from it playing.
+const LIGHT: MapPalette = { heard: '#00796b', playing: '#00a896', here: '#e8609b', unheard: '#5f6b6a', me: '#00a896', path: '#00796b' }
+const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', here: '#ff7ab8', unheard: '#8a9091', me: '#00f0d8', path: '#00f0d8' }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 const OFFER_TIMEOUT_MS = 45_000 // an unanswered pop-up slips into the queue
 const GPS_START = { source: 'gps', route: routes[0], speed: 1.4, noise: false } as const
-// About 5.5 km at 25 m/s: a ride of under four minutes, so a visitor hears it through.
-const RIDE_START = { source: 'simulate', route: showcaseRoute, speed: 25, noise: false } as const
+// About 5.5 km at 140 m/s: a ride of about 40 s. The places come faster than the stories
+// (62 s in all), so later ones wait in the queue and play on after the ride ends.
+const RIDE_START = { source: 'simulate', route: showcaseRoute, speed: 140, noise: false } as const
 const RIDE_FROM: [number, number] = [showcaseRoute.points[0].lat, showcaseRoute.points[0].lng]
 const distance = (m: number) => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`)
 

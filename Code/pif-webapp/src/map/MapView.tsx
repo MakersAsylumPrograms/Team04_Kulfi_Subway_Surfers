@@ -11,6 +11,8 @@ import { distanceToStory } from '../trigger/trigger'
 export interface MapPalette {
   heard: string
   playing: string
+  /** A story's circle you're standing in, before it plays. */
+  here: string
   unheard: string
   me: string
   path: string
@@ -18,6 +20,7 @@ export interface MapPalette {
 const DEFAULT_PALETTE: MapPalette = {
   heard: '#1c1917',
   playing: '#b45309',
+  here: '#db2777',
   unheard: '#78716c',
   me: '#2563eb',
   path: '#1c1917',
@@ -158,13 +161,14 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       const playing = story.id === playingId
       const heard = heardIds.has(story.id)
       const here = inside.has(story.id)
-      // Standing in a story you haven't heard tints it with the playing colour, like the wash.
-      const color = playing || (here && !heard) ? palette.playing : heard ? palette.heard : palette.unheard
+      // Standing in a story you haven't heard tints it with the "here" colour, like the wash;
+      // it turns the playing colour once the story plays.
+      const color = playing ? palette.playing : here && !heard ? palette.here : heard ? palette.heard : palette.unheard
       if (arrived.has(story.id)) {
         L.circle([story.lat, story.lng], {
           radius: story.radius_m,
           stroke: false,
-          fillColor: palette.playing,
+          fillColor: palette.here,
           fillOpacity: 0.14,
           interactive: false,
           className: 'pif-story-wash',
