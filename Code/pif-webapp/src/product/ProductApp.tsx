@@ -13,6 +13,8 @@ import { Intro } from './Intro'
 import { JamWordmark } from './JamWordmark'
 import mascot from './assets/jam-mascot.svg'
 import { FOG_ENABLED, FOG_REVEAL_M, useFog } from './useFog'
+import { HeardList } from './HeardList'
+import { useHeard } from './useHeard'
 import { useIntro } from './useIntro'
 import { useTheme } from './useTheme'
 
@@ -75,15 +77,24 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   const intro = useIntro()
   // Which story has its text open; a new story starts closed.
   const [readingId, setReadingId] = useState<string | null>(null)
-  const heardIds = useMemo(() => new Set(journey.heard.map((s) => s.id)), [journey.heard])
+  // Your heard collection (saved on the phone; per page on /showcase), its list, and the
+  // card a tap on a heard story's circle opens to play it again.
+  const heard = useHeard(journey.nowPlaying, !showcase)
+  const heardIds = useMemo(() => new Set(heard.map((e) => e.id)), [heard])
+  const [heardOpen, setHeardOpen] = useState(false)
+  const [replay, setReplay] = useState<Story | null>(null)
+  const playAgain = (story: Story) => {
+    setReplay(null)
+    setHeardOpen(false)
+    journey.listen(story)
+  }
   const active = journey.status !== 'idle'
   const np = journey.nowPlaying
   const here = journey.here
   const [queueOpen, setQueueOpen] = useState(false)
 
-  // Fog and locked pins (experiment, /showcase only; ?fog=0 turns both off there): only
-  // stories near where you've been are on the map, and those you haven't heard show just
-  // their place name.
+  // Fog (experiment, /showcase only; ?fog=0 turns it off there): only stories near where
+  // you've been are on the map.
   const fogOn = FOG_ENABLED && showcase
   const fog = useFog(fogOn ? journey.fix : null, stories, false)
   const fogPoints = fog.points
@@ -141,6 +152,7 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           stories={stories}
           revealed={revealed}
           heardIds={heardIds}
+          onStoryTap={(story) => heardIds.has(story.id) && story.id !== journey.nowPlaying?.story.id && setReplay(story)}
           playingId={np?.story.id ?? null}
           fallbackCenter={showcase ? RIDE_FROM : [stories[0].lat, stories[0].lng]}
           close={stories.some((s) => s.radius_m <= 50)}
@@ -152,7 +164,6 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
               ? { points: fogPoints, clearings: fog.clearings, radiusM: FOG_REVEAL_M, rgb: theme.dark ? [24, 26, 28] : [228, 230, 232] }
               : undefined
           }
-          lockedLabels={fogOn}
         />
       </div>
 
@@ -181,6 +192,13 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           >
             ?
           </button>
+          <button
+            type="button"
+            onClick={() => setHeardOpen(true)}
+            className="flex h-11 items-center gap-1.5 rounded-full bg-[var(--surface)]/95 px-4 text-sm font-semibold shadow-lg ring-1 ring-[var(--line)] backdrop-blur active:scale-95"
+          >
+            Heard <span className="text-[var(--muted)] tabular-nums">{heard.length}</span>
+          </button>
           {/* Theme button, hidden while the app is light only:
           <button
             type="button"
@@ -207,6 +225,16 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
 
       {/* Bottom: the story offer pops up above one sheet that says what Jam is doing. */}
       <div className="absolute inset-x-0 bottom-0 z-[1001] mx-auto max-w-md">
+        {replay && !journey.offer && (
+          <Offer
+            story={replay}
+            distance={null}
+            eyebrow="Heard before"
+            dismissLabel="Close"
+            onListen={() => playAgain(replay)}
+            onLater={() => setReplay(null)}
+          />
+        )}
         {journey.offer && (
           <Offer
             story={journey.offer}
@@ -327,6 +355,16 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
         </section>
       </div>
 
+      {heardOpen && (
+        <HeardList
+          entries={heard}
+          stories={stories}
+          playingId={np?.story.id ?? null}
+          onPlay={playAgain}
+          onClose={() => setHeardOpen(false)}
+        />
+      )}
+
       {intro.open && <Intro onClose={intro.close} splash={intro.firstVisit} />}
     </div>
   )
@@ -337,7 +375,15 @@ function distanceTo(fix: { lat: number; lng: number }, story: Story) {
 }
 
 /** The pop-up when you reach a place: one compact row, listen now or keep it for later. */
-function Offer(props: { story: Story; distance: number | null; onListen: () => void; onLater: () => void }) {
+function Offer(props: {
+  story: Story
+  distance: number | null
+  /** Overrides the "Story here" line, e.g. for replaying a heard story. */
+  eyebrow?: string
+  dismissLabel?: string
+  onListen: () => void
+  onLater: () => void
+}) {
   return (
     <div
       role="alertdialog"
@@ -346,9 +392,10 @@ function Offer(props: { story: Story; distance: number | null; onListen: () => v
     >
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-bold tracking-widest text-[var(--accent)] uppercase">
-          {props.distance !== null && props.distance > props.story.radius_m
-            ? `Story · ${distance(props.distance - props.story.radius_m)} back`
-            : 'Story here'}
+          {props.eyebrow ??
+            (props.distance !== null && props.distance > props.story.radius_m
+              ? `Story · ${distance(props.distance - props.story.radius_m)} back`
+              : 'Story here')}
         </p>
         <p className="font-display truncate text-lg leading-tight font-bold">{props.story.place}</p>
         <p className="truncate text-sm text-[var(--muted)]">{props.story.title}</p>
@@ -358,7 +405,7 @@ function Offer(props: { story: Story; distance: number | null; onListen: () => v
         onClick={props.onLater}
         className="h-11 shrink-0 rounded-xl px-3 text-sm font-semibold text-[var(--muted)] active:scale-95"
       >
-        Later
+        {props.dismissLabel ?? 'Later'}
       </button>
       <button
         type="button"

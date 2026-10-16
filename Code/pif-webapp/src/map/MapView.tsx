@@ -50,17 +50,21 @@ interface Props {
   meIcon?: string
   /** Fog over everything except around these points (an experiment on the visitor map). */
   fog?: FogOptions & { points: [number, number][]; clearings: FogClearing[] }
-  /** Unheard stories show only their place name, with a lock, until you've heard them. */
-  lockedLabels?: boolean
+  /** Tapping a story's circle (the product replays heard ones). */
+  onStoryTap?: (story: Story) => void
   children?: ReactNode
 }
 
-export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, meIcon, fog, lockedLabels = false, children }: Props) {
+export function MapView({ fix, path, stories, revealed, heardIds, playingId, fallbackCenter, close = false, fill = false, palette = DEFAULT_PALETTE, bottomInset = 0, meIcon, fog, onStoryTap, children }: Props) {
   const paletteRef = useRef(palette)
   useEffect(() => {
     paletteRef.current = palette
   }, [palette])
   const meIconRef = useRef(meIcon)
+  const onStoryTapRef = useRef(onStoryTap)
+  useEffect(() => {
+    onStoryTapRef.current = onStoryTap
+  }, [onStoryTap])
   const fogOptionsRef = useRef(fog ? { rgb: fog.rgb, radiusM: fog.radiusM } : null)
   const fogRef = useRef<FogLayer | null>(null)
   const zoom = close ? CLOSE_ZOOM : ZOOM
@@ -176,7 +180,6 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       const playing = story.id === playingId
       const heard = heardIds.has(story.id)
       const here = inside.has(story.id)
-      const locked = lockedLabels && !heard && !playing
       // Standing in a story you haven't heard tints it with the "here" colour, like the wash;
       // it turns the playing colour once the story plays.
       const color = playing ? palette.playing : here && !heard ? palette.here : heard ? palette.heard : palette.unheard
@@ -199,14 +202,11 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
         fillOpacity: playing ? 0.2 : heard ? 0.12 : arrived.has(story.id) ? 0 : here ? 0.14 : 0.05,
         className: arrived.has(story.id) ? 'pif-story-arrive' : undefined,
       })
-        .bindTooltip(locked ? story.place : story.title, {
-          permanent: true,
-          direction: 'center',
-          className: locked ? 'pif-story-label pif-story-locked' : 'pif-story-label',
-        })
+        .bindTooltip(story.title, { permanent: true, direction: 'center', className: 'pif-story-label' })
+        .on('click', () => onStoryTapRef.current?.(story))
         .addTo(group)
     }
-  }, [stories, revealed, heardIds, playingId, palette, insideKey, lockedLabels])
+  }, [stories, revealed, heardIds, playingId, palette, insideKey])
 
   const recenter = () => {
     followingRef.current = true

@@ -181,7 +181,7 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
         setQueue(rest)
         play(nextUp)
       } else {
-        setStatus((s) => (s === 'idle' ? s : 'listening'))
+        setStatus((s) => (s === 'idle' || !sourceRef.current ? 'idle' : 'listening'))
       }
       return
     }
@@ -192,7 +192,7 @@ export function useJourney(stories: readonly Story[], pet: PetLink | null, optio
     if (waiting && f && distanceToStory(f, waiting) <= waiting.radius_m) {
       play(waiting)
     } else {
-      setStatus((s) => (s === 'idle' ? s : 'listening'))
+      setStatus((s) => (s === 'idle' || !sourceRef.current ? 'idle' : 'listening'))
     }
   }, [play, output, askFirst, setQueue])
 
