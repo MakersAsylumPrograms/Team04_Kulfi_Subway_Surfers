@@ -15,4 +15,6 @@ export interface Story {
   duration_s: number
   source: string
   approved: boolean
+  /** false keeps a story off the /showcase ride (it still plays on the real app). */
+  showcase?: boolean
 }

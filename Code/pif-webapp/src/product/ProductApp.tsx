@@ -25,8 +25,9 @@ import { useTheme } from './useTheme'
 // /showcase is the same app riding a simulated route (Dadar, Worli, the Nehru Centre), for
 // demonstrating in a room where no train exists.
 
-const stories = bundledStories
-const allIds = new Set(stories.map((s) => s.id))
+// /showcase leaves out stories marked "showcase": false (small spots inside a big place).
+const liveStories = bundledStories
+const rideStories = bundledStories.filter((s) => s.showcase !== false)
 const SHEET_PX = 170 // roughly how tall the bottom sheet is, to keep your dot visible above it
 
 // "here" is the mascot's pink, so standing in a story's circle reads differently from it playing.
@@ -71,6 +72,8 @@ function usePreviewFix(): Fix | null {
 export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   // Light only for now (2026-10-15). Drop lightOnly and restore the theme button below to bring dark back.
   const theme = useTheme({ lightOnly: true })
+  const stories = showcase ? rideStories : liveStories
+  const allIds = useMemo(() => new Set(stories.map((s) => s.id)), [stories])
   const pet = usePet(stories)
   const journey = useJourney(stories, pet.pet, { askFirst: true })
   const previewFix = usePreviewFix()
@@ -109,7 +112,7 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
               .map((st) => st.id),
           )
         : allIds,
-    [fogPoints, fogOn],
+    [fogPoints, fogOn, stories, allIds],
   )
 
   // If this browser already allows location, start listening for places straight away.
@@ -157,7 +160,6 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           onStoryTap={(story) => heardIds.has(story.id) && story.id !== journey.nowPlaying?.story.id && setReplay(story)}
           playingId={np?.story.id ?? null}
           fallbackCenter={showcase ? RIDE_FROM : [stories[0].lat, stories[0].lng]}
-          close={stories.some((s) => s.radius_m <= 50)}
           palette={theme.dark ? DARK : LIGHT}
           bottomInset={SHEET_PX}
           meIcon={mascot}
