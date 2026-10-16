@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Story } from '../data/types'
 import type { Fix } from '../position/types'
 import { distanceToStory } from '../trigger/trigger'
-import { FogLayer, type FogOptions } from './fog'
+import { FogLayer, type FogClearing, type FogOptions } from './fog'
 
 // Plain Leaflet driven from effects: one map instance, layers updated in place.
 
@@ -49,7 +49,7 @@ interface Props {
   /** A picture for your position (the product's mascot) instead of the plain dot. */
   meIcon?: string
   /** Fog over everything except around these points (an experiment on the visitor map). */
-  fog?: FogOptions & { points: [number, number][] }
+  fog?: FogOptions & { points: [number, number][]; clearings: FogClearing[] }
   /** Unheard stories show only their place name, with a lock, until you've heard them. */
   lockedLabels?: boolean
   children?: ReactNode
@@ -61,7 +61,7 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     paletteRef.current = palette
   }, [palette])
   const meIconRef = useRef(meIcon)
-  const fogOptionsRef = useRef(fog ? { color: fog.color, radiusM: fog.radiusM } : null)
+  const fogOptionsRef = useRef(fog ? { rgb: fog.rgb, radiusM: fog.radiusM } : null)
   const fogRef = useRef<FogLayer | null>(null)
   const zoom = close ? CLOSE_ZOOM : ZOOM
   const zoomRef = useRef(zoom)
@@ -149,9 +149,10 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
   }, [path])
 
   const fogPoints = fog?.points
+  const fogClearings = fog?.clearings
   useEffect(() => {
-    if (fogPoints) fogRef.current?.setPoints(fogPoints)
-  }, [fogPoints])
+    if (fogPoints) fogRef.current?.setPoints(fogPoints, fogClearings ?? [])
+  }, [fogPoints, fogClearings])
 
   // Which story circles you're standing in. Keyed as a string so the circles are only redrawn
   // when you cross a boundary, not on every fix (that would restart the arrival animation).

@@ -83,7 +83,8 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
 
   // Fog and locked pins (experiment, ?fog=0 turns both off): only stories near where you've
   // been are on the map, and those you haven't heard show just their place name.
-  const fogPoints = useFog(journey.fix, !showcase)
+  const fog = useFog(journey.fix, stories, !showcase)
+  const fogPoints = fog.points
   const revealed = useMemo(
     () =>
       FOG_ENABLED
@@ -146,7 +147,7 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
           meIcon={mascot}
           fog={
             FOG_ENABLED
-              ? { points: fogPoints, radiusM: FOG_REVEAL_M, color: theme.dark ? 'rgba(10, 11, 12, 0.88)' : 'rgba(236, 234, 228, 0.92)' }
+              ? { points: fogPoints, clearings: fog.clearings, radiusM: FOG_REVEAL_M, rgb: theme.dark ? [24, 26, 28] : [228, 230, 232] }
               : undefined
           }
           lockedLabels={FOG_ENABLED}
