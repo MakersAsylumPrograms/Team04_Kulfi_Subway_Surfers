@@ -146,24 +146,43 @@ body {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
 }
 
-/* A story circle you're standing in breathes: its fill and outline swell and settle. */
-@keyframes pif-breathe {
-  0%,
-  100% {
-    fill-opacity: 0.1;
-    stroke-width: 1.5px;
+/* Arriving in a story's circle (MapView): the outline spins once, dashed, then settles solid,
+   while a faint wash grows out from the centre to fill the circle. */
+@keyframes pif-arrive-spin {
+  0% {
+    stroke-dasharray: 14 10;
+    stroke-dashoffset: 0;
   }
-  50% {
-    fill-opacity: 0.3;
-    stroke-width: 5px;
+  99% {
+    stroke-dasharray: 14 10;
+    stroke-dashoffset: -240;
+  }
+  100% {
+    stroke-dasharray: none;
+    stroke-dashoffset: -240;
   }
 }
-.pif-story-inside {
-  animation: pif-breathe 2.4s ease-in-out infinite;
+.pif-story-arrive {
+  animation: pif-arrive-spin 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes pif-wash {
+  0% {
+    transform: scale(0);
+    fill-opacity: 0.4;
+  }
+  100% {
+    transform: scale(1);
+    fill-opacity: 0.14;
+  }
+}
+.pif-story-wash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pif-wash 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  .pif-story-inside {
+  .pif-story-arrive,
+  .pif-story-wash {
     animation: none;
-    fill-opacity: 0.25;
   }
 }

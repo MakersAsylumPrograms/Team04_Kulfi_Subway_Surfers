@@ -136,15 +136,20 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
     layersRef.current?.path.setLatLngs(path)
   }, [path])
 
-  // Stories whose circle you're standing in breathe gently. Keyed as a string so the circles
-  // are only redrawn when you cross a boundary, not on every fix (that would restart the animation).
+  // Which story circles you're standing in. Keyed as a string so the circles are only redrawn
+  // when you cross a boundary, not on every fix (that would restart the arrival animation).
   const insideKey = useMemo(
     () => (fix ? stories.filter((st) => distanceToStory(fix, st) <= st.radius_m).map((st) => st.id).join('|') : ''),
     [fix, stories],
   )
+  const wasInsideRef = useRef<ReadonlySet<string>>(new Set())
 
   useEffect(() => {
-    const inside = new Set(insideKey.split('|'))
+    const inside = new Set(insideKey ? insideKey.split('|') : [])
+    // Arriving in a circle plays once: its outline spins while a faint wash grows out from the
+    // centre to fill it, then both settle. Later redraws (a story starting, say) don't replay it.
+    const arrived = new Set([...inside].filter((id) => !wasInsideRef.current.has(id)))
+    wasInsideRef.current = inside
     const group = layersRef.current?.stories
     if (!group) return
     group.clearLayers()
@@ -152,15 +157,27 @@ export function MapView({ fix, path, stories, revealed, heardIds, playingId, fal
       if (!revealed.has(story.id)) continue
       const playing = story.id === playingId
       const heard = heardIds.has(story.id)
-      const color = playing ? palette.playing : heard ? palette.heard : palette.unheard
+      const here = inside.has(story.id)
+      // Standing in a story you haven't heard tints it with the playing colour, like the wash.
+      const color = playing || (here && !heard) ? palette.playing : heard ? palette.heard : palette.unheard
+      if (arrived.has(story.id)) {
+        L.circle([story.lat, story.lng], {
+          radius: story.radius_m,
+          stroke: false,
+          fillColor: palette.playing,
+          fillOpacity: 0.14,
+          interactive: false,
+          className: 'pif-story-wash',
+        }).addTo(group)
+      }
       L.circle([story.lat, story.lng], {
         radius: story.radius_m,
         color,
-        weight: 1.5,
-        dashArray: heard || playing ? undefined : '4 4',
+        weight: here ? 2.5 : 1.5,
+        dashArray: heard || playing || here ? undefined : '4 4',
         fillColor: color,
-        fillOpacity: playing ? 0.2 : heard ? 0.12 : 0.05,
-        className: inside.has(story.id) ? 'pif-story-inside' : undefined,
+        fillOpacity: playing ? 0.2 : heard ? 0.12 : arrived.has(story.id) ? 0 : here ? 0.14 : 0.05,
+        className: arrived.has(story.id) ? 'pif-story-arrive' : undefined,
       })
         .bindTooltip(story.title, { permanent: true, direction: 'center', className: 'pif-story-label' })
         .addTo(group)
