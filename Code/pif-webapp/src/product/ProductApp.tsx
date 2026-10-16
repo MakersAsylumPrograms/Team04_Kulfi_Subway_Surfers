@@ -35,6 +35,7 @@ const LIGHT: MapPalette = { heard: '#00796b', playing: '#00a896', here: '#e8609b
 const DARK: MapPalette = { heard: '#7ff7ea', playing: '#00f0d8', here: '#ff7ab8', unheard: '#8a9091', me: '#00f0d8', path: '#00f0d8' }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+const READ_KEY = 'pif.read.v1'
 const OFFER_TIMEOUT_MS = 45_000 // an unanswered pop-up slips into the queue
 const GPS_START = { source: 'gps', route: routes[0], speed: 1.4, noise: false } as const
 // About 5.5 km at 140 m/s: a ride of about 40 s. The places come faster than the stories
@@ -78,8 +79,23 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
   const journey = useJourney(stories, pet.pet, { askFirst: true })
   const previewFix = usePreviewFix()
   const intro = useIntro()
-  // Which story has its text open; a new story starts closed.
-  const [readingId, setReadingId] = useState<string | null>(null)
+  // Read mode: once you open a story's text it stays open for every story after it, until
+  // you tap Read again. Remembered on this phone. The audio plays either way.
+  const [reading, setReading] = useState(() => {
+    try {
+      return localStorage.getItem(READ_KEY) === 'on'
+    } catch {
+      return false
+    }
+  })
+  const toggleReading = () => setReading((on) => !on)
+  useEffect(() => {
+    try {
+      localStorage.setItem(READ_KEY, reading ? 'on' : 'off')
+    } catch {
+      // no storage: it just won't be remembered
+    }
+  }, [reading])
   // Your heard collection (saved on the phone; per page on /showcase), its list, and the
   // card a tap on a heard story's circle opens to play it again.
   const heard = useHeard(journey.nowPlaying, !showcase)
@@ -350,8 +366,8 @@ export function ProductApp({ showcase = false }: { showcase?: boolean }) {
               source={np.story.source}
               position={journey.position}
               paused={journey.paused}
-              reading={readingId === np.story.id}
-              onRead={() => setReadingId((r) => (r === np.story.id ? null : np.story.id))}
+              reading={reading}
+              onRead={toggleReading}
               onPause={journey.togglePause}
               onSkip={journey.skip}
             />
