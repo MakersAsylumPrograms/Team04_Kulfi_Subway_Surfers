@@ -402,9 +402,11 @@ function NowPlaying(props: {
       {props.reading && (
         <div className="mt-3 max-h-[28dvh] overflow-y-auto rounded-xl bg-[var(--surface-2)] p-3 text-sm leading-relaxed">
           {props.text}
-          <a href={props.source} target="_blank" rel="noreferrer" className="mt-2 block text-xs text-[var(--muted)] underline">
-            Source
-          </a>
+          {props.source && (
+            <a href={props.source} target="_blank" rel="noreferrer" className="mt-2 block text-xs text-[var(--muted)] underline">
+              Source
+            </a>
+          )}
         </div>
       )}
 
